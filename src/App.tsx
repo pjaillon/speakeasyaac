@@ -8,8 +8,14 @@ import { ControlBar } from './components/ControlBar';
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [interim, setInterim] = useState('');
-  const [suggestions, setSuggestions] = useState<string[]>([
-    "Yes", "No", "Thank you", "Please", "I need help", "Wait"
+  const [suggestions, setSuggestions] = useState<Array<{ text: string, variant: 'default' | 'uncertainty' }>>([
+    { text: "Yes", variant: 'default' },
+    { text: "No", variant: 'default' },
+    { text: "Thank you", variant: 'default' },
+    { text: "Please", variant: 'default' },
+    { text: "I need help", variant: 'default' },
+    { text: "Wait", variant: 'default' },
+    { text: "I don't know", variant: 'uncertainty' }
   ]);
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -40,7 +46,7 @@ function App() {
         const history = messagesRef.current.map(m => `${m.role === 'user' ? 'Speaker' : 'Me'}: ${m.content}`).join('\n');
 
         // Pass previous history and current new sentence separately
-        const { suggestions: newSuggestions, correctedText } = await generateSuggestions(history, text);
+        const { suggestions: newSuggestions, uncertaintyResponse, correctedText } = await generateSuggestions(history, text);
 
         // Update user message with punctuated text if available
         if (correctedText && correctedText !== text) {
@@ -55,7 +61,12 @@ function App() {
         }
 
         if (newSuggestions.length > 0) {
-          setSuggestions(newSuggestions);
+          const structuredSuggestions = newSuggestions.map(s => ({ text: s, variant: 'default' as const }));
+          const finalSuggestions = [
+            ...structuredSuggestions,
+            { text: uncertaintyResponse || "I don't know", variant: 'uncertainty' as const }
+          ];
+          setSuggestions(finalSuggestions);
         }
       } catch (err: any) {
         console.error(err);

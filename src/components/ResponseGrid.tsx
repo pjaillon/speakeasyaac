@@ -1,7 +1,12 @@
 import React from 'react';
 
+interface Suggestion {
+    text: string;
+    variant: 'default' | 'uncertainty';
+}
+
 interface Props {
-    suggestions: string[];
+    suggestions: Suggestion[];
     onSelect: (text: string) => void;
     isLoading: boolean;
 }
@@ -19,13 +24,16 @@ export const ResponseGrid: React.FC<Props> = ({ suggestions, onSelect, isLoading
 
     return (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {suggestions.map((text, index) => (
+            {suggestions.map((item, index) => (
                 <button
                     key={index}
-                    onClick={() => onSelect(text)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-6 px-4 rounded-xl shadow-lg transform transition active:scale-95 text-lg md:text-xl break-words"
+                    onClick={() => onSelect(item.text)}
+                    className={`${item.variant === 'uncertainty'
+                            ? 'bg-sky-500 hover:bg-sky-600'
+                            : 'bg-indigo-600 hover:bg-indigo-700'
+                        } text-white font-bold py-6 px-4 rounded-xl shadow-lg transform transition active:scale-95 text-lg md:text-xl break-words`}
                 >
-                    {text}
+                    {item.text}
                 </button>
             ))}
         </div>
