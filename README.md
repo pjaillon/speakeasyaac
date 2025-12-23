@@ -1,6 +1,6 @@
-# React + TypeScript + Vite
+# SpeakEasy AAC
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This project is a modern Augmentative and Alternative Communication (AAC) web application designed to help users communicate effectively.
 
 Currently, two official plugins are available:
 
