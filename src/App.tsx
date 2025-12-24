@@ -49,7 +49,7 @@ function App() {
     return saved ? JSON.parse(saved) : [];
   });
   const [showCustomPanel, setShowCustomPanel] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<'all' | 'food' | 'comfort' | 'general' | 'yes-no' | 'help'>('all');
+  const [activeCategory, setActiveCategory] = useState<'auto' | 'food' | 'comfort' | 'general' | 'yes-no' | 'help'>('auto');
 
   const speechManagerRef = useRef<SpeechManager | null>(null);
 
@@ -85,6 +85,14 @@ function App() {
             }
             return updated;
           });
+        }
+
+        // Auto-detect category when in auto mode
+        if (activeCategory === 'auto' && correctedText) {
+          const detectedCategory = detectContextCategory(correctedText);
+          if (detectedCategory !== 'auto') {
+            setActiveCategory(detectedCategory);
+          }
         }
 
         if (newSuggestions.length > 0) {
@@ -162,6 +170,41 @@ function App() {
     localStorage.removeItem('speakeasy_phrase_history');
   };
 
+  // Detect context from user's sentence
+  const detectContextCategory = (text: string): 'food' | 'comfort' | 'general' | 'yes-no' | 'help' | 'auto' => {
+    const lower = text.toLowerCase();
+    
+    // Food keywords
+    const foodKeywords = ['food', 'eat', 'hungry', 'thirsty', 'drink', 'salad', 'pizza', 'burger', 'want', 'like', 'taste', 'meal', 'dinner', 'lunch', 'breakfast'];
+    if (foodKeywords.some(kw => lower.includes(kw))) return 'food';
+    
+    // Comfort keywords (pain, temperature, mood)
+    const comfortKeywords = ['hurt', 'pain', 'cold', 'hot', 'tired', 'sleep', 'comfortable', 'scared', 'sad', 'happy', 'mood', 'feel', 'fever', 'ache'];
+    if (comfortKeywords.some(kw => lower.includes(kw))) return 'comfort';
+    
+    // Help keywords
+    const helpKeywords = ['help', 'emergency', 'call', 'doctor', 'hospital', 'urgent', '911', 'need', 'sick', 'problem'];
+    if (helpKeywords.some(kw => lower.includes(kw))) return 'help';
+    
+    // Yes/no questions are already handled in llm.ts
+    if (/^(is|are|am|was|were|do|does|did|have|has|had|can|could|will|would|should|may|might|must)\s/i.test(lower)) {
+      return 'yes-no';
+    }
+    
+    return 'auto';
+  };
+
+  // Filter suggestions based on active category
+  const getFilteredSuggestions = () => {
+    if (activeCategory === 'auto') {
+      return suggestions;
+    }
+    
+    // Category-based filtering would be implemented here if needed
+    // For now, just return all suggestions when not in auto mode
+    return suggestions;
+  };
+
   const handleTileClick = (text: string) => {
     // 1. Speak it with selected gender
     speechManagerRef.current?.speak(text, voiceGender);
@@ -235,7 +278,7 @@ function App() {
               </button>
             </div>
             <ResponseGrid
-              suggestions={suggestions}
+              suggestions={getFilteredSuggestions()}
               onSelect={handleTileClick}
               isLoading={isLoading}
               onAddFavorite={addToFavorites}
