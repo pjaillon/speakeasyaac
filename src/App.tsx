@@ -53,7 +53,7 @@ function App() {
         const history = messagesRef.current.map(m => `${m.role === 'user' ? 'Speaker' : 'Me'}: ${m.content}`).join('\n');
 
         // Pass previous history and current new sentence separately
-        const { suggestions: newSuggestions, uncertaintyResponse, correctedText } = await generateSuggestions(history, text);
+        const { suggestions: newSuggestions, correctedText } = await generateSuggestions(history, text);
 
         // Update user message with punctuated text if available
         if (correctedText && correctedText !== text) {
@@ -69,11 +69,7 @@ function App() {
 
         if (newSuggestions.length > 0) {
           const structuredSuggestions = newSuggestions.map(s => ({ text: s, variant: 'default' as const }));
-          const finalSuggestions = [
-            ...structuredSuggestions,
-            { text: uncertaintyResponse || "I don't know", variant: 'uncertainty' as const }
-          ];
-          setSuggestions(finalSuggestions);
+          setSuggestions(structuredSuggestions);
         }
       } catch (err: any) {
         console.error(err);
