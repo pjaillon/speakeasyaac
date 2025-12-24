@@ -23,6 +23,12 @@ function App() {
 
   // Voice Selection State
   const [voiceGender, setVoiceGender] = useState<'female' | 'male'>('female');
+  
+  // Font Size State (in rem units)
+  const [fontSize, setFontSize] = useState(1);
+  const MIN_FONT_SIZE = 0.75;
+  const MAX_FONT_SIZE = 2;
+  const FONT_SIZE_STEP = 0.25;
 
   const speechManagerRef = useRef<SpeechManager | null>(null);
 
@@ -100,6 +106,14 @@ function App() {
     setVoiceGender(prev => prev === 'female' ? 'male' : 'female');
   };
 
+  const increaseFontSize = () => {
+    setFontSize(prev => Math.min(prev + FONT_SIZE_STEP, MAX_FONT_SIZE));
+  };
+
+  const decreaseFontSize = () => {
+    setFontSize(prev => Math.max(prev - FONT_SIZE_STEP, MIN_FONT_SIZE));
+  };
+
   const handleTileClick = (text: string) => {
     // 1. Speak it with selected gender
     speechManagerRef.current?.speak(text, voiceGender);
@@ -140,7 +154,7 @@ function App() {
           )}
         </div>
       </header>
-
+fontSize={fontSize} 
       <main className="flex-1 flex flex-col gap-6 max-w-5xl mx-auto w-full h-[calc(100vh-140px)]">
         {errorMsg && (
           <div className="bg-red-100 text-red-700 p-4 rounded-xl border border-red-200">
@@ -148,7 +162,7 @@ function App() {
           </div>
         )}
 
-        <TranscriptionStream messages={messages} interimTranscript={interim} />
+        <TranscriptionStream messages={messages} interimTranscript={interim} fontSize={fontSize} />
 
         <div className="flex-none">
           <h2 className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wide">Suggested Responses</h2>
@@ -163,6 +177,9 @@ function App() {
           isListening={isListening}
           onToggleListening={toggleListening}
           onClear={clearTranscript}
+          fontSize={fontSize}
+          onIncreaseFontSize={increaseFontSize}
+          onDecreaseFontSize={decreaseFontSize}
         />
       </main>
     </div>

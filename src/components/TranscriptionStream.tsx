@@ -9,9 +9,10 @@ export interface Message {
 interface Props {
     messages: Message[];
     interimTranscript: string;
+    fontSize: number;
 }
 
-export const TranscriptionStream: React.FC<Props> = ({ messages, interimTranscript }) => {
+export const TranscriptionStream: React.FC<Props> = ({ messages, interimTranscript, fontSize }) => {
     const bottomRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -32,10 +33,11 @@ export const TranscriptionStream: React.FC<Props> = ({ messages, interimTranscri
                     className={`flex ${msg.role === 'assistant' ? 'justify-end' : 'justify-start'}`}
                 >
                     <div
-                        className={`max-w-[80%] rounded-2xl px-5 py-3 shadow-sm text-lg ${msg.role === 'assistant'
+                        className={`max-w-[80%] rounded-2xl px-5 py-3 shadow-sm ${msg.role === 'assistant'
                                 ? 'bg-indigo-600 text-white rounded-br-none'
                                 : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-none border border-gray-200 dark:border-gray-600'
                             }`}
+                        style={{ fontSize: `${fontSize}rem` }}
                     >
                         {msg.content}
                     </div>
@@ -44,7 +46,10 @@ export const TranscriptionStream: React.FC<Props> = ({ messages, interimTranscri
 
             {interimTranscript && (
                 <div className="flex justify-start">
-                    <div className="max-w-[80%] rounded-2xl px-5 py-3 shadow-sm text-lg bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-bl-none animate-pulse italic">
+                    <div 
+                        className="max-w-[80%] rounded-2xl px-5 py-3 shadow-sm bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-bl-none animate-pulse italic"
+                        style={{ fontSize: `${fontSize}rem` }}
+                    >
                         {interimTranscript} ...
                     </div>
                 </div>
