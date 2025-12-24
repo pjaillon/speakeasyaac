@@ -4,6 +4,10 @@ import { generateSuggestions, isMockMode } from './services/llm';
 import { TranscriptionStream, type Message } from './components/TranscriptionStream';
 import { ResponseGrid } from './components/ResponseGrid';
 import { ControlBar } from './components/ControlBar';
+import { FavoritePhrases } from './components/FavoritePhrases';
+import { CategoryFilter } from './components/CategoryFilter';
+import { PhraseHistory } from './components/PhraseHistory';
+import { CustomPhrasesPanel } from './components/CustomPhrasesPanel';
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -30,6 +34,22 @@ function App() {
   // Map preset to actual rem value
   const fontSizeMap = { small: 0.875, medium: 1, large: 1.5 };
   const fontSize = fontSizeMap[fontSizePreset];
+
+  // Favorites, Custom Phrases, History, and Category state
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    const saved = localStorage.getItem('speakeasy_favorites');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [customPhrases, setCustomPhrases] = useState<string[]>(() => {
+    const saved = localStorage.getItem('speakeasy_custom_phrases');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [phraseHistory, setPhraseHistory] = useState<string[]>(() => {
+    const saved = localStorage.getItem('speakeasy_phrase_history');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [showCustomPanel, setShowCustomPanel] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<'all' | 'food' | 'comfort' | 'general' | 'yes-no' | 'help'>('all');
 
   const speechManagerRef = useRef<SpeechManager | null>(null);
 
@@ -107,12 +127,49 @@ function App() {
     setFontSizePreset(preset);
   };
 
+  const addToFavorites = (phrase: string) => {
+    const updated = [...new Set([...favorites, phrase])];
+    setFavorites(updated);
+    localStorage.setItem('speakeasy_favorites', JSON.stringify(updated));
+  };
+
+  const removeFromFavorites = (phrase: string) => {
+    const updated = favorites.filter(f => f !== phrase);
+    setFavorites(updated);
+    localStorage.setItem('speakeasy_favorites', JSON.stringify(updated));
+  };
+
+  const addCustomPhrase = (phrase: string) => {
+    const updated = [...new Set([...customPhrases, phrase])];
+    setCustomPhrases(updated);
+    localStorage.setItem('speakeasy_custom_phrases', JSON.stringify(updated));
+  };
+
+  const removeCustomPhrase = (phrase: string) => {
+    const updated = customPhrases.filter(p => p !== phrase);
+    setCustomPhrases(updated);
+    localStorage.setItem('speakeasy_custom_phrases', JSON.stringify(updated));
+  };
+
+  const addToHistory = (phrase: string) => {
+    const updated = [phrase, ...phraseHistory.filter(p => p !== phrase)].slice(0, 20);
+    setPhraseHistory(updated);
+    localStorage.setItem('speakeasy_phrase_history', JSON.stringify(updated));
+  };
+
+  const clearHistory = () => {
+    setPhraseHistory([]);
+    localStorage.removeItem('speakeasy_phrase_history');
+  };
+
   const handleTileClick = (text: string) => {
     // 1. Speak it with selected gender
     speechManagerRef.current?.speak(text, voiceGender);
     // 2. Add to chat as 'assistant' (Me)
     const newMsg: Message = { role: 'assistant', content: text, timestamp: Date.now() };
     setMessages(prev => [...prev, newMsg]);
+    // 3. Add to phrase history
+    addToHistory(text);
   };
 
   const clearTranscript = () => {
@@ -148,30 +205,65 @@ function App() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col gap-6 max-w-5xl mx-auto w-full h-[calc(100vh-140px)]">
-        {errorMsg && (
-          <div className="bg-red-100 text-red-700 p-4 rounded-xl border border-red-200">
-            Error: {errorMsg}
-          </div>
-        )}
+      <main className="flex-1 flex gap-4 max-w-7xl mx-auto w-full h-[calc(100vh-140px)] overflow-hidden">
+        <div className="flex-1 flex flex-col gap-4 overflow-y-auto">
+          {errorMsg && (
+            <div className="bg-red-100 text-red-700 p-4 rounded-xl border border-red-200">
+              Error: {errorMsg}
+            </div>
+          )}
 
-        <TranscriptionStream messages={messages} interimTranscript={interim} fontSize={fontSize} />
+          <TranscriptionStream messages={messages} interimTranscript={interim} fontSize={fontSize} />
 
-        <div className="flex-none">
-          <h2 className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wide">Suggested Responses</h2>
-          <ResponseGrid
-            suggestions={suggestions}
+          <FavoritePhrases 
+            favorites={favorites} 
             onSelect={handleTileClick}
-            isLoading={isLoading}
+            onRemoveFavorite={removeFromFavorites}
+          />
+
+          <CategoryFilter activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
+
+          <div className="flex-none">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Suggested Responses</h2>
+              <button
+                onClick={() => setShowCustomPanel(true)}
+                className="text-xs px-3 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors font-semibold"
+                title="Manage custom phrases"
+              >
+                + Custom
+              </button>
+            </div>
+            <ResponseGrid
+              suggestions={suggestions}
+              onSelect={handleTileClick}
+              isLoading={isLoading}
+              onAddFavorite={addToFavorites}
+              isFavorite={(text) => favorites.includes(text)}
+            />
+          </div>
+
+          <ControlBar
+            isListening={isListening}
+            onToggleListening={toggleListening}
+            onClear={clearTranscript}
+            fontSizePreset={fontSizePreset}
+            onSetFontSize={setFontSize}
           />
         </div>
 
-        <ControlBar
-          isListening={isListening}
-          onToggleListening={toggleListening}
-          onClear={clearTranscript}
-          fontSizePreset={fontSizePreset}
-          onSetFontSize={setFontSize}
+        <PhraseHistory 
+          history={phraseHistory}
+          onSelect={handleTileClick}
+          onClear={clearHistory}
+        />
+
+        <CustomPhrasesPanel
+          isOpen={showCustomPanel}
+          customPhrases={customPhrases}
+          onClose={() => setShowCustomPanel(false)}
+          onAdd={addCustomPhrase}
+          onRemove={removeCustomPhrase}
         />
       </main>
     </div>
