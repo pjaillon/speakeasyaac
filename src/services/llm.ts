@@ -184,17 +184,21 @@ export async function generateSuggestions(history: string, currentUtterance: str
                 const hasYes = suggestionsLower.includes('yes');
                 const hasNo = suggestionsLower.includes('no');
                 
-                const finalSuggestions = [...suggestions];
+                // Start fresh with Yes/No options
+                let finalSuggestions: string[] = [];
                 
-                // Add Yes if not present and we have room
-                if (!hasYes && finalSuggestions.length < 8) {
-                    finalSuggestions.unshift('Yes');
-                }
+                // Always add Yes first
+                finalSuggestions.push('Yes');
                 
-                // Add No if not present and we have room
-                if (!hasNo && finalSuggestions.length < 8) {
-                    finalSuggestions.splice(hasYes ? 2 : 1, 0, 'No');
-                }
+                // Always add No second
+                finalSuggestions.push('No');
+                
+                // Add other suggestions that aren't Yes/No (avoid duplicates)
+                suggestions.forEach(s => {
+                    if (s.toLowerCase() !== 'yes' && s.toLowerCase() !== 'no' && finalSuggestions.length < 8) {
+                        finalSuggestions.push(s);
+                    }
+                });
                 
                 return { suggestions: finalSuggestions.slice(0, 8), uncertaintyResponse, correctedText };
             }
