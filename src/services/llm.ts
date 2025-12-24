@@ -119,6 +119,7 @@ export async function generateSuggestions(history: string, currentUtterance: str
         // Helper to clean suggestions: remove numbers, dots, extra punctuation, normalize spacing
         const cleanText = (s: string) => {
             return s
+                .replace(/^(uncertainty_response|corrected_text|suggestions):\s*/i, '') // Remove field name prefixes
                 .replace(/^[\d\-\.\)\s]+/, '') // Remove leading numbers, dashes, dots, parens
                 .replace(/[\*\`\"]+/g, '') // Remove asterisks, backticks, quotes
                 .replace(/\s+/g, ' ') // Normalize multiple spaces to single space
