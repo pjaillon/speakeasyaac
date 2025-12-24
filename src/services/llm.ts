@@ -213,10 +213,29 @@ export async function generateSuggestions(history: string, currentUtterance: str
                 .filter(s => s.length > 0 && !s.includes('{') && !s.includes('}'))
                 .slice(0, 8);
 
+            const correctedText = addPunctuation(currentUtterance);
+            const uncertaintyResponse = "I'm not sure";
+            let suggestions = fallbackSuggestions.length > 0 ? fallbackSuggestions : MOCK_SUGGESTIONS;
+
+            // Apply yes/no question logic to fallback as well
+            if (isYesNoQuestion(correctedText)) {
+                let finalSuggestions: string[] = [];
+                finalSuggestions.push('Yes');
+                finalSuggestions.push('No');
+                
+                suggestions.forEach(s => {
+                    if (s.toLowerCase() !== 'yes' && s.toLowerCase() !== 'no' && finalSuggestions.length < 8) {
+                        finalSuggestions.push(s);
+                    }
+                });
+                
+                suggestions = finalSuggestions.slice(0, 8);
+            }
+
             return {
-                suggestions: fallbackSuggestions.length > 0 ? fallbackSuggestions : MOCK_SUGGESTIONS,
-                uncertaintyResponse: "I'm not sure",
-                correctedText: addPunctuation(currentUtterance)
+                suggestions,
+                uncertaintyResponse,
+                correctedText
             };
         }
 
