@@ -149,25 +149,43 @@ export async function generateSuggestions(history: string, currentUtterance: str
             const parsed = JSON.parse(jsonContent);
             let rawSuggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
             
-            // If we have only 1 suggestion but it's very long (likely multiple options joined),
-            // try to split it on common delimiters
-            if (rawSuggestions.length === 1 && typeof rawSuggestions[0] === 'string' && rawSuggestions[0].length > 40) {
-                const singleSuggestion = rawSuggestions[0];
-                // Try to split on common delimiters: "? ", ". ", ", " or just "?"
-                const splitAttempts = [
-                    singleSuggestion.split('?').filter(s => s.trim().length > 0),
-                    singleSuggestion.split('. ').filter(s => s.trim().length > 0),
-                    singleSuggestion.split(', ').filter(s => s.trim().length > 0),
+            // Helper to split a single suggestion if it contains multiple items
+            const splitIfNeeded = (item: string): string[] => {
+                if (item.length < 30) return [item]; // Don't split short items
+                
+                // Try splitting on common delimiters, prioritizing by likeliness
+                const attempts = [
+                    item.split(',').map(s => s.trim()).filter(s => s.length > 0),
+                    item.split('?').map(s => s.trim()).filter(s => s.length > 0),
+                    item.split('.').map(s => s.trim()).filter(s => s.length > 0 && s !== ''),
                 ];
                 
-                // Use the split that gives us the most items (between 2-8)
-                const bestSplit = splitAttempts.find(arr => arr.length >= 2 && arr.length <= 8);
-                if (bestSplit && bestSplit.length >= 2) {
-                    rawSuggestions = bestSplit;
+                // Return split if we get 2-8 items, otherwise return original
+                for (const attempt of attempts) {
+                    if (attempt.length >= 2 && attempt.length <= 8) {
+                        return attempt;
+                    }
+                }
+                return [item];
+            };
+            
+            // Expand suggestions by splitting any that contain multiple items
+            let expandedSuggestions: string[] = [];
+            for (const suggestion of rawSuggestions) {
+                if (typeof suggestion === 'string') {
+                    expandedSuggestions.push(...splitIfNeeded(suggestion));
                 }
             }
             
-            const suggestions = rawSuggestions.slice(0, 8).map(cleanText).filter(s => s.length > 0);
+            // If we only got 1 suggestion and it's very long, try splitting it differently
+            if (expandedSuggestions.length === 1 && expandedSuggestions[0].length > 40) {
+                const split = splitIfNeeded(expandedSuggestions[0]);
+                if (split.length >= 2) {
+                    expandedSuggestions = split;
+                }
+            }
+            
+            const suggestions = expandedSuggestions.slice(0, 8).map(cleanText).filter(s => s.length > 0);
 
             let uncertaintyResponse = typeof parsed.uncertainty_response === 'string' ? parsed.uncertainty_response : "I don't know";
             uncertaintyResponse = cleanText(uncertaintyResponse);
@@ -205,10 +223,31 @@ export async function generateSuggestions(history: string, currentUtterance: str
         } catch (e) {
             console.warn("JSON Parse failed, attempting fallback split", rawContent);
             // Fallback: assume line split is just suggestions, but filter out anything that looks like code/JSON
-            const fallbackSuggestions = rawContent.split('\n')
+            let fallbackSuggestions = rawContent.split('\n')
                 .map(cleanText)
-                .filter(s => s.length > 0 && !s.includes('{') && !s.includes('}'))
-                .slice(0, 8);
+                .filter(s => s.length > 0 && !s.includes('{') && !s.includes('}'));
+
+            // Also split any suggestions that contain multiple items
+            const splitIfNeeded = (item: string): string[] => {
+                if (item.length < 30) return [item];
+                const attempts = [
+                    item.split(',').map(s => s.trim()).filter(s => s.length > 0),
+                    item.split('?').map(s => s.trim()).filter(s => s.length > 0),
+                    item.split('.').map(s => s.trim()).filter(s => s.length > 0 && s !== ''),
+                ];
+                for (const attempt of attempts) {
+                    if (attempt.length >= 2 && attempt.length <= 8) {
+                        return attempt;
+                    }
+                }
+                return [item];
+            };
+
+            let expandedFallback: string[] = [];
+            for (const suggestion of fallbackSuggestions) {
+                expandedFallback.push(...splitIfNeeded(suggestion));
+            }
+            fallbackSuggestions = expandedFallback.slice(0, 8);
 
             const correctedText = addPunctuation(currentUtterance);
             const uncertaintyResponse = "I'm not sure";
