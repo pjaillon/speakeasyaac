@@ -180,10 +180,6 @@ export async function generateSuggestions(history: string, currentUtterance: str
 
             // For yes/no questions, ensure Yes and No are always options
             if (isYesNoQuestion(correctedText)) {
-                const suggestionsLower = suggestions.map(s => s.toLowerCase());
-                const hasYes = suggestionsLower.includes('yes');
-                const hasNo = suggestionsLower.includes('no');
-                
                 // Start fresh with Yes/No options
                 let finalSuggestions: string[] = [];
                 
@@ -193,9 +189,11 @@ export async function generateSuggestions(history: string, currentUtterance: str
                 // Always add No second
                 finalSuggestions.push('No');
                 
-                // Add other suggestions that aren't Yes/No (avoid duplicates)
+                // Add other suggestions that aren't Yes/No variants (avoid duplicates)
+                // Strip punctuation for comparison
                 suggestions.forEach(s => {
-                    if (s.toLowerCase() !== 'yes' && s.toLowerCase() !== 'no' && finalSuggestions.length < 8) {
+                    const cleanedLower = s.toLowerCase().replace(/[!?.,]/g, '').trim();
+                    if (cleanedLower !== 'yes' && cleanedLower !== 'no' && finalSuggestions.length < 8) {
                         finalSuggestions.push(s);
                     }
                 });
@@ -224,7 +222,8 @@ export async function generateSuggestions(history: string, currentUtterance: str
                 finalSuggestions.push('No');
                 
                 suggestions.forEach(s => {
-                    if (s.toLowerCase() !== 'yes' && s.toLowerCase() !== 'no' && finalSuggestions.length < 8) {
+                    const cleanedLower = s.toLowerCase().replace(/[!?.,]/g, '').trim();
+                    if (cleanedLower !== 'yes' && cleanedLower !== 'no' && finalSuggestions.length < 8) {
                         finalSuggestions.push(s);
                     }
                 });
