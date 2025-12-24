@@ -4,12 +4,11 @@ interface Props {
     isListening: boolean;
     onToggleListening: () => void;
     onClear: () => void;
-    fontSize: number;
-    onIncreaseFontSize: () => void;
-    onDecreaseFontSize: () => void;
+    fontSizePreset: 'small' | 'medium' | 'large';
+    onSetFontSize: (preset: 'small' | 'medium' | 'large') => void;
 }
 
-export const ControlBar: React.FC<Props> = ({ isListening, onToggleListening, onClear, fontSize, onIncreaseFontSize, onDecreaseFontSize }) => {
+export const ControlBar: React.FC<Props> = ({ isListening, onToggleListening, onClear, fontSizePreset, onSetFontSize }) => {
     return (
         <div className="flex justify-between items-center bg-white dark:bg-gray-900 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
             <div className="flex space-x-4">
@@ -27,26 +26,39 @@ export const ControlBar: React.FC<Props> = ({ isListening, onToggleListening, on
             <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
                     <button
-                        onClick={onDecreaseFontSize}
-                        title="Decrease font size"
-                        className="px-3 py-2 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition-colors font-semibold"
+                        onClick={() => onSetFontSize('small')}
+                        className={`px-3 py-2 text-sm rounded-lg transition-colors font-semibold ${fontSizePreset === 'small'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200'
+                            }`}
+                        title="Small font size"
                     >
-                        A−
+                        S
                     </button>
-                    <span className="text-sm font-semibold text-gray-600 dark:text-gray-300 w-12 text-center">
-                        {(fontSize * 100).toFixed(0)}%
-                    </span>
                     <button
-                        onClick={onIncreaseFontSize}
-                        title="Increase font size"
-                        className="px-3 py-2 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition-colors font-semibold"
+                        onClick={() => onSetFontSize('medium')}
+                        className={`px-4 py-2 text-sm rounded-lg transition-colors font-semibold ${fontSizePreset === 'medium'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200'
+                            }`}
+                        title="Medium font size"
                     >
-                        A+
+                        M
+                    </button>
+                    <button
+                        onClick={() => onSetFontSize('large')}
+                        className={`px-3 py-2 text-sm rounded-lg transition-colors font-semibold ${fontSizePreset === 'large'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200'
+                            }`}
+                        title="Large font size"
+                    >
+                        L
                     </button>
                 </div>
                 <button
                     onClick={onClear}
-                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 font-medium px-4"
+                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 font-semibold rounded-lg transition-colors"
                 >
                     Clear Transcript
                 </button>

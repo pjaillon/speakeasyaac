@@ -24,11 +24,12 @@ function App() {
   // Voice Selection State
   const [voiceGender, setVoiceGender] = useState<'female' | 'male'>('female');
   
-  // Font Size State (in rem units)
-  const [fontSize, setFontSize] = useState(1);
-  const MIN_FONT_SIZE = 0.75;
-  const MAX_FONT_SIZE = 2;
-  const FONT_SIZE_STEP = 0.25;
+  // Font Size State ('small' | 'medium' | 'large')
+  const [fontSizePreset, setFontSizePreset] = useState<'small' | 'medium' | 'large'>('medium');
+  
+  // Map preset to actual rem value
+  const fontSizeMap = { small: 0.875, medium: 1, large: 1.5 };
+  const fontSize = fontSizeMap[fontSizePreset];
 
   const speechManagerRef = useRef<SpeechManager | null>(null);
 
@@ -106,12 +107,8 @@ function App() {
     setVoiceGender(prev => prev === 'female' ? 'male' : 'female');
   };
 
-  const increaseFontSize = () => {
-    setFontSize(prev => Math.min(prev + FONT_SIZE_STEP, MAX_FONT_SIZE));
-  };
-
-  const decreaseFontSize = () => {
-    setFontSize(prev => Math.max(prev - FONT_SIZE_STEP, MIN_FONT_SIZE));
+  const setFontSize = (preset: 'small' | 'medium' | 'large') => {
+    setFontSizePreset(preset);
   };
 
   const handleTileClick = (text: string) => {
@@ -154,7 +151,7 @@ function App() {
           )}
         </div>
       </header>
-fontSize={fontSize} 
+
       <main className="flex-1 flex flex-col gap-6 max-w-5xl mx-auto w-full h-[calc(100vh-140px)]">
         {errorMsg && (
           <div className="bg-red-100 text-red-700 p-4 rounded-xl border border-red-200">
@@ -177,9 +174,8 @@ fontSize={fontSize}
           isListening={isListening}
           onToggleListening={toggleListening}
           onClear={clearTranscript}
-          fontSize={fontSize}
-          onIncreaseFontSize={increaseFontSize}
-          onDecreaseFontSize={decreaseFontSize}
+          fontSizePreset={fontSizePreset}
+          onSetFontSize={setFontSize}
         />
       </main>
     </div>
