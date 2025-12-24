@@ -194,15 +194,64 @@ function App() {
     return 'auto';
   };
 
+  // Category-specific suggestion sets
+  const getCategorySuggestions = () => {
+    const categorySets: Record<string, Array<{ text: string, variant: 'default' | 'uncertainty' }>> = {
+      'auto': suggestions, // Use AI-generated suggestions
+      'yes-no': [
+        { text: 'Yes', variant: 'default' },
+        { text: 'No', variant: 'default' },
+        { text: 'Maybe', variant: 'uncertainty' },
+        { text: "I am not sure", variant: 'uncertainty' },
+      ],
+      'food': [
+        { text: 'Pizza', variant: 'default' },
+        { text: 'Tacos', variant: 'default' },
+        { text: 'Salad', variant: 'default' },
+        { text: 'Sandwich', variant: 'default' },
+        { text: 'Pasta', variant: 'default' },
+        { text: 'Burger', variant: 'default' },
+        { text: 'Water', variant: 'default' },
+        { text: "Not hungry", variant: 'uncertainty' },
+      ],
+      'comfort': [
+        { text: "I am cold", variant: 'default' },
+        { text: "I am hot", variant: 'default' },
+        { text: "I am tired", variant: 'default' },
+        { text: 'I need a break', variant: 'default' },
+        { text: 'Can you help?', variant: 'default' },
+        { text: 'That hurts', variant: 'default' },
+        { text: 'More please', variant: 'default' },
+        { text: "I am okay", variant: 'uncertainty' },
+      ],
+      'general': [
+        { text: 'Yes', variant: 'default' },
+        { text: 'No', variant: 'default' },
+        { text: 'Thank you', variant: 'default' },
+        { text: 'Please', variant: 'default' },
+        { text: 'Hello', variant: 'default' },
+        { text: 'Goodbye', variant: 'default' },
+        { text: 'Sorry', variant: 'default' },
+        { text: "I do not know", variant: 'uncertainty' },
+      ],
+      'help': [
+        { text: 'I need help', variant: 'default' },
+        { text: 'Emergency', variant: 'default' },
+        { text: 'Call doctor', variant: 'default' },
+        { text: 'Call 911', variant: 'default' },
+        { text: 'Something is wrong', variant: 'default' },
+        { text: 'Get someone', variant: 'default' },
+        { text: 'Hurry!', variant: 'default' },
+        { text: 'Please wait', variant: 'uncertainty' },
+      ],
+    };
+
+    return categorySets[activeCategory] || categorySets['general'];
+  };
+
   // Filter suggestions based on active category
   const getFilteredSuggestions = () => {
-    if (activeCategory === 'auto') {
-      return suggestions;
-    }
-    
-    // Category-based filtering would be implemented here if needed
-    // For now, just return all suggestions when not in auto mode
-    return suggestions;
+    return getCategorySuggestions();
   };
 
   const handleTileClick = (text: string) => {
@@ -219,6 +268,37 @@ function App() {
     setMessages([]);
     setInterim('');
     setErrorMsg(null);
+  };
+
+  const resetApp = () => {
+    // Clear all state
+    setMessages([]);
+    setInterim('');
+    setSuggestions([
+      { text: "Yes", variant: 'default' },
+      { text: "No", variant: 'default' },
+      { text: "Thank you", variant: 'default' },
+      { text: "Please", variant: 'default' },
+      { text: "I need help", variant: 'default' },
+      { text: "Wait", variant: 'default' },
+      { text: "I don't know", variant: 'uncertainty' }
+    ]);
+    setErrorMsg(null);
+    setFontSizePreset('medium');
+    setActiveCategory('auto');
+    setShowCustomPanel(false);
+    setVoiceGender('female');
+    
+    // Clear all localStorage
+    localStorage.removeItem('speakeasy_favorites');
+    localStorage.removeItem('speakeasy_custom_phrases');
+    localStorage.removeItem('speakeasy_phrase_history');
+    localStorage.removeItem('speakeasy_font_size');
+    
+    // Update state
+    setFavorites([]);
+    setCustomPhrases([]);
+    setPhraseHistory([]);
   };
 
   return (
@@ -290,6 +370,7 @@ function App() {
             isListening={isListening}
             onToggleListening={toggleListening}
             onClear={clearTranscript}
+            onReset={resetApp}
             fontSizePreset={fontSizePreset}
             onSetFontSize={setFontSize}
           />

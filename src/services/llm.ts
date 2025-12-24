@@ -106,11 +106,14 @@ export async function generateSuggestions(history: string, currentUtterance: str
                         "   - Add '.' otherwise\n" +
                         "   - ALWAYS end with proper punctuation. However, the 'suggestions' fields MUST NOT end with a period.\n" +
                         "3. Focus on the 'Current Utterance' for suggestions.\n" +
-                        "4. INCLUDE open/uncertain options (e.g., 'Maybe', 'I don't know', 'We will see') if relevant to the question.\n" +
-                        "5. Output exactly 6 to 8 standard options (1-3 words max).\n" +
-                        "6. PROVIDE a specific, highly contextual 'uncertainty_response' (e.g. 'Hmmm...', 'What?', 'Not sure yet', 'Let me think') that specifically fits the current conversation.\n" +
-                        "7. DO NOT enumerate suggestions (no 1. 2. etc).\n" +
-                        "8. Return ONLY a JSON object: { \"suggestions\": string[], \"uncertainty_response\": string, \"corrected_text\": string }"
+                        "4. For PREFERENCE questions (what do you like, which do you prefer, etc), provide SPECIFIC OPTIONS not generic answers. For example:\n" +
+                        "   - Q: What flavors of ice cream do you like? A: Vanilla, Chocolate, Strawberry, Mint, Cookies & Cream, Caramel\n" +
+                        "   - Q: What do you want to eat? A: Pizza, Tacos, Salad, Sandwich, Pasta, Burger\n" +
+                        "5. INCLUDE open/uncertain options (e.g., 'Maybe', 'I don't know') if relevant to the question.\n" +
+                        "6. Output exactly 6 to 8 standard options (1-3 words max).\n" +
+                        "7. PROVIDE a specific, highly contextual 'uncertainty_response' (e.g. 'Hmmm...', 'What?', 'Not sure yet', 'Let me think') that specifically fits the current conversation.\n" +
+                        "8. DO NOT enumerate suggestions (no 1. 2. etc).\n" +
+                        "9. Return ONLY a JSON object: { \"suggestions\": string[], \"uncertainty_response\": string, \"corrected_text\": string }"
                 },
                 {
                     role: "user",
@@ -133,16 +136,16 @@ export async function generateSuggestions(history: string, currentUtterance: str
         // Helper to clean suggestions: remove numbers, dots, extra punctuation, normalize spacing
         const cleanText = (s: string) => {
             return s
-                .replace(/^(uncertainty_response|corrected_text|suggestions):\s*/i, '') // Remove field name prefixes
-                .replace(/^[\d\-\.\)\s]+/, '') // Remove leading numbers, dashes, dots, parens
-                .replace(/[\*\`\"]+/g, '') // Remove asterisks, backticks, quotes
-                .replace(/\s+/g, ' ') // Normalize multiple spaces to single space
+                    .replace(/^(uncertainty_response|corrected_text|suggestions|suggesting|uncertainty\s+response|history):\s*/i, '') // Remove field name prefixes
+                    .replace(/^[\d\-\.\)\s]+/, '') // Remove leading numbers, dashes, dots, parens
+                    .replace(/[\*\`\"]+/g, '') // Remove asterisks, backticks, quotes
+                    .replace(/\s+/g, ' ') // Normalize multiple spaces to single space
                 .replace(/\.$/, '') // Remove trailing period
                 .trim() // Trim whitespace
                 .split(' ') // Capitalize first letter of each word
                 .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
                 .join(' ')
-                .substring(0, 50); // Limit to 50 chars to fit in tiles
+                .substring(0, 65); // Limit to 65 chars to fit in tiles
         };
 
         try {
@@ -185,7 +188,20 @@ export async function generateSuggestions(history: string, currentUtterance: str
                 }
             }
             
-            const suggestions = expandedSuggestions.slice(0, 8).map(cleanText).filter(s => s.length > 0);
+            const suggestions = expandedSuggestions
+                .slice(0, 8)
+                .map(cleanText)
+                .filter(s => {
+                    // Filter out empty strings
+                    if (s.length < 2) return false;
+                    // Filter out pure quotes or whitespace
+                    if (s.match(/^['"\s]*$/)) return false;
+                    // Filter out any remaining metadata keywords
+                    if (s.match(/^(uncertainty|history|hmmm|hmm|what\s|corrected|suggestions)/i)) return false;
+                    // Filter out items that are mostly the same as the user's input (meta references)
+                    if (s.length > 20 && currentUtterance.toLowerCase().includes(s.toLowerCase().substring(0, 10))) return false;
+                    return true;
+                });
 
             let uncertaintyResponse = typeof parsed.uncertainty_response === 'string' ? parsed.uncertainty_response : "I don't know";
             uncertaintyResponse = cleanText(uncertaintyResponse);
@@ -247,7 +263,14 @@ export async function generateSuggestions(history: string, currentUtterance: str
             for (const suggestion of fallbackSuggestions) {
                 expandedFallback.push(...splitIfNeeded(suggestion));
             }
-            fallbackSuggestions = expandedFallback.slice(0, 8);
+            fallbackSuggestions = expandedFallback.slice(0, 8).filter(s => {
+                // Same aggressive filtering as above
+                if (s.length < 2) return false;
+                if (s.match(/^['"\s]*$/)) return false;
+                if (s.match(/^(uncertainty|history|hmmm|hmm|what\s|corrected|suggestions)/i)) return false;
+                if (s.length > 20 && currentUtterance.toLowerCase().includes(s.toLowerCase().substring(0, 10))) return false;
+                return true;
+            });
 
             const correctedText = addPunctuation(currentUtterance);
             const uncertaintyResponse = "I'm not sure";
