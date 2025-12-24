@@ -18,17 +18,16 @@ const MOCK_SUGGESTIONS = [
 
 /**
  * Detects if text is a yes/no question
+ * Only matches questions that start with typical yes/no question words
  */
 function isYesNoQuestion(text: string): boolean {
     const cleanText = text.toLowerCase().trim();
     
-    // Yes/no question patterns
-    const yesNoPatterns = [
-        /^(is|are|am|was|were|do|does|did|have|has|had|can|could|will|would|should|may|might|must)\s/i,
-        /\b(you|anyone|somebody|anything|something)\b.*\?/i, // "Did you...?" "Does anyone...?"
-    ];
+    // Only match questions that START with yes/no question words
+    // These are questions that naturally expect a yes/no answer
+    const yesNoPattern = /^(is|are|am|was|were|do|does|did|have|has|had|can|could|will|would|should|may|might|must)\s/i;
     
-    return yesNoPatterns.some(pattern => pattern.test(cleanText)) && cleanText.includes('?');
+    return yesNoPattern.test(cleanText) && cleanText.includes('?');
 }
 
 /**
