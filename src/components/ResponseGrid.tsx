@@ -31,7 +31,8 @@ export const ResponseGrid: React.FC<Props> = ({ suggestions, onSelect, isLoading
                     className={`${item.variant === 'uncertainty'
                             ? 'bg-sky-500 hover:bg-sky-600'
                             : 'bg-indigo-600 hover:bg-indigo-700'
-                        } text-white font-bold py-6 px-4 rounded-xl shadow-lg transform transition active:scale-95 text-lg md:text-xl break-words`}
+                        } text-white font-bold py-6 px-4 rounded-xl shadow-lg transform transition active:scale-95 text-sm md:text-base break-words line-clamp-3 h-full flex items-center justify-center text-center`}
+                    title={item.text}
                 >
                     {item.text}
                 </button>

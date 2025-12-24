@@ -16,6 +16,50 @@ const MOCK_SUGGESTIONS = [
     "I need help", "Goodbye"
 ];
 
+/**
+ * Detects the type of sentence and adds appropriate punctuation
+ * Questions: ends with ?
+ * Exclamations: ends with !
+ * Statements: ends with .
+ */
+function addPunctuation(text: string, originalUtterance?: string): string {
+    text = text.trim();
+    
+    // Already has punctuation
+    if (text && /[.!?]$/.test(text)) {
+        return text;
+    }
+
+    // Check for question indicators
+    const questionPatterns = [
+        /^(is|are|am|was|were|do|does|did|have|has|had|can|could|will|would|should|may|might|must|what|when|where|why|which|who|whose|how)\s/i,
+        /\b(right|yeah|ok|innit|huh)\s*$/i, // Tag questions
+        /\?$/, // Already has question mark
+    ];
+
+    const isQuestion = questionPatterns.some(pattern => pattern.test(text));
+
+    // Check for exclamation indicators
+    const exclamationPatterns = [
+        /\b(wow|awesome|amazing|great|excellent|incredible|fantastic|wonderful|horrible|terrible|dreadful|yay|hurray|help|watch out)\b/i,
+        /^(no|yes)\s+(way|sir|ma'am|really|absolutely)/, // Strong emphatic
+        /!$/, // Already has exclamation
+    ];
+
+    const isExclamation = exclamationPatterns.some(pattern => pattern.test(text)) ||
+                          (originalUtterance && /[A-Z]/.test(originalUtterance[0]) && 
+                           originalUtterance.toUpperCase() === originalUtterance && 
+                           originalUtterance.length > 2); // All caps
+
+    if (isQuestion) {
+        return text + '?';
+    } else if (isExclamation) {
+        return text + '!';
+    } else {
+        return text + '.';
+    }
+}
+
 export function isMockMode(): boolean {
     return !openai;
 }
@@ -28,7 +72,7 @@ export async function generateSuggestions(history: string, currentUtterance: str
         return {
             suggestions: MOCK_SUGGESTIONS,
             uncertaintyResponse: "I'm not sure",
-            correctedText: currentUtterance
+            correctedText: addPunctuation(currentUtterance)
         };
     }
 
@@ -42,7 +86,11 @@ export async function generateSuggestions(history: string, currentUtterance: str
                         "Your goal is to suggest short responses for the user to say and to punctuate the user's input.\n\n" +
                         "CRITICAL INSTRUCTIONS:\n" +
                         "1. ACT AS THE USER. Do not behave like an AI assistant. If the input is 'Are you human?', suggest 'Yes'.\n" +
-                        "2. PUNCTUATION: The 'corrected_text' field MUST BE FULLY PUNCTUATED (add . ? ! as needed). However, the 'suggestions' fields MUST NOT end with a period.\n" +
+                        "2. PUNCTUATION: The 'corrected_text' field MUST BE FULLY PUNCTUATED:\n" +
+                        "   - Add '?' if the input is a question or sounds inquisitive\n" +
+                        "   - Add '!' if the input is emphatic or excited\n" +
+                        "   - Add '.' otherwise\n" +
+                        "   - ALWAYS end with proper punctuation. However, the 'suggestions' fields MUST NOT end with a period.\n" +
                         "3. Focus on the 'Current Utterance' for suggestions.\n" +
                         "4. INCLUDE open/uncertain options (e.g., 'Maybe', 'I don't know', 'We will see') if relevant to the question.\n" +
                         "5. Output exactly 6 to 8 standard options (1-3 words max).\n" +
@@ -68,8 +116,19 @@ export async function generateSuggestions(history: string, currentUtterance: str
             jsonContent = rawContent.substring(firstBrace, lastBrace + 1);
         }
 
-        // Helper to clean suggestions (remove numbers, dots)
-        const cleanText = (s: string) => s.replace(/^[\d\-\.\)\s]+/, '').replace(/\.$/, '').trim();
+        // Helper to clean suggestions: remove numbers, dots, extra punctuation, normalize spacing
+        const cleanText = (s: string) => {
+            return s
+                .replace(/^[\d\-\.\)\s]+/, '') // Remove leading numbers, dashes, dots, parens
+                .replace(/[\*\`\"]+/g, '') // Remove asterisks, backticks, quotes
+                .replace(/\s+/g, ' ') // Normalize multiple spaces to single space
+                .replace(/\.$/, '') // Remove trailing period
+                .trim() // Trim whitespace
+                .split(' ') // Capitalize first letter of each word
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join(' ')
+                .substring(0, 50); // Limit to 50 chars to fit in tiles
+        };
 
         try {
             const parsed = JSON.parse(jsonContent);
@@ -79,7 +138,10 @@ export async function generateSuggestions(history: string, currentUtterance: str
             let uncertaintyResponse = typeof parsed.uncertainty_response === 'string' ? parsed.uncertainty_response : "I don't know";
             uncertaintyResponse = cleanText(uncertaintyResponse);
 
-            const correctedText = typeof parsed.corrected_text === 'string' ? parsed.corrected_text : currentUtterance;
+            let correctedText = typeof parsed.corrected_text === 'string' ? parsed.corrected_text : currentUtterance;
+            
+            // Ensure corrected text ends with proper punctuation
+            correctedText = addPunctuation(correctedText, currentUtterance);
 
             return { suggestions, uncertaintyResponse, correctedText };
 
@@ -94,7 +156,7 @@ export async function generateSuggestions(history: string, currentUtterance: str
             return {
                 suggestions: fallbackSuggestions.length > 0 ? fallbackSuggestions : MOCK_SUGGESTIONS,
                 uncertaintyResponse: "I'm not sure",
-                correctedText: currentUtterance
+                correctedText: addPunctuation(currentUtterance)
             };
         }
 
