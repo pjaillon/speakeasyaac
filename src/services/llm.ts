@@ -17,6 +17,21 @@ const MOCK_SUGGESTIONS = [
 ];
 
 /**
+ * Detects if text is a yes/no question
+ */
+function isYesNoQuestion(text: string): boolean {
+    const cleanText = text.toLowerCase().trim();
+    
+    // Yes/no question patterns
+    const yesNoPatterns = [
+        /^(is|are|am|was|were|do|does|did|have|has|had|can|could|will|would|should|may|might|must)\s/i,
+        /\b(you|anyone|somebody|anything|something)\b.*\?/i, // "Did you...?" "Does anyone...?"
+    ];
+    
+    return yesNoPatterns.some(pattern => pattern.test(cleanText)) && cleanText.includes('?');
+}
+
+/**
  * Detects the type of sentence and adds appropriate punctuation
  * Questions: ends with ?
  * Exclamations: ends with !
@@ -162,6 +177,27 @@ export async function generateSuggestions(history: string, currentUtterance: str
             
             // Ensure corrected text ends with proper punctuation
             correctedText = addPunctuation(correctedText, currentUtterance);
+
+            // For yes/no questions, ensure Yes and No are always options
+            if (isYesNoQuestion(correctedText)) {
+                const suggestionsLower = suggestions.map(s => s.toLowerCase());
+                const hasYes = suggestionsLower.includes('yes');
+                const hasNo = suggestionsLower.includes('no');
+                
+                const finalSuggestions = [...suggestions];
+                
+                // Add Yes if not present and we have room
+                if (!hasYes && finalSuggestions.length < 8) {
+                    finalSuggestions.unshift('Yes');
+                }
+                
+                // Add No if not present and we have room
+                if (!hasNo && finalSuggestions.length < 8) {
+                    finalSuggestions.splice(hasYes ? 2 : 1, 0, 'No');
+                }
+                
+                return { suggestions: finalSuggestions.slice(0, 8), uncertaintyResponse, correctedText };
+            }
 
             return { suggestions, uncertaintyResponse, correctedText };
 
