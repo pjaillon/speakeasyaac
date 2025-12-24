@@ -133,8 +133,27 @@ export async function generateSuggestions(history: string, currentUtterance: str
 
         try {
             const parsed = JSON.parse(jsonContent);
-            const rawSuggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
-            const suggestions = rawSuggestions.slice(0, 8).map(cleanText);
+            let rawSuggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+            
+            // If we have only 1 suggestion but it's very long (likely multiple options joined),
+            // try to split it on common delimiters
+            if (rawSuggestions.length === 1 && typeof rawSuggestions[0] === 'string' && rawSuggestions[0].length > 40) {
+                const singleSuggestion = rawSuggestions[0];
+                // Try to split on common delimiters: "? ", ". ", ", " or just "?"
+                const splitAttempts = [
+                    singleSuggestion.split('?').filter(s => s.trim().length > 0),
+                    singleSuggestion.split('. ').filter(s => s.trim().length > 0),
+                    singleSuggestion.split(', ').filter(s => s.trim().length > 0),
+                ];
+                
+                // Use the split that gives us the most items (between 2-8)
+                const bestSplit = splitAttempts.find(arr => arr.length >= 2 && arr.length <= 8);
+                if (bestSplit && bestSplit.length >= 2) {
+                    rawSuggestions = bestSplit;
+                }
+            }
+            
+            const suggestions = rawSuggestions.slice(0, 8).map(cleanText).filter(s => s.length > 0);
 
             let uncertaintyResponse = typeof parsed.uncertainty_response === 'string' ? parsed.uncertainty_response : "I don't know";
             uncertaintyResponse = cleanText(uncertaintyResponse);
