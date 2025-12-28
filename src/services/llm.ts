@@ -123,7 +123,7 @@ export async function generateSuggestions(history: string, currentUtterance: str
             temperature: 0.7,
         });
 
-        let rawContent = response.choices[0].message.content || "";
+        const rawContent = response.choices[0].message.content || "";
 
         // Robust JSON extraction: Find first { and last }
         const firstBrace = rawContent.indexOf('{');
@@ -137,8 +137,8 @@ export async function generateSuggestions(history: string, currentUtterance: str
         const cleanText = (s: string) => {
             return s
                     .replace(/^(uncertainty_response|corrected_text|suggestions|suggesting|uncertainty\s+response|history):\s*/i, '') // Remove field name prefixes
-                    .replace(/^[\d\-\.\)\s]+/, '') // Remove leading numbers, dashes, dots, parens
-                    .replace(/[\*\`\"]+/g, '') // Remove asterisks, backticks, quotes
+                    .replace(/^[\d\-.)\s]+/, '') // Remove leading numbers, dashes, dots, parens
+                    .replace(/[*`"]+/g, '') // Remove asterisks, backticks, quotes
                     .replace(/\s+/g, ' ') // Normalize multiple spaces to single space
                 .replace(/\.$/, '') // Remove trailing period
                 .trim() // Trim whitespace
@@ -150,7 +150,7 @@ export async function generateSuggestions(history: string, currentUtterance: str
 
         try {
             const parsed = JSON.parse(jsonContent);
-            let rawSuggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+            const rawSuggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
             
             // Helper to split a single suggestion if it contains multiple items
             const splitIfNeeded = (item: string): string[] => {
@@ -214,7 +214,7 @@ export async function generateSuggestions(history: string, currentUtterance: str
             // For yes/no questions, ensure Yes and No are always options
             if (isYesNoQuestion(correctedText)) {
                 // Start fresh with Yes/No options
-                let finalSuggestions: string[] = [];
+                const finalSuggestions: string[] = [];
                 
                 // Always add Yes first
                 finalSuggestions.push('Yes');
@@ -236,8 +236,8 @@ export async function generateSuggestions(history: string, currentUtterance: str
 
             return { suggestions, uncertaintyResponse, correctedText };
 
-        } catch (e) {
-            console.warn("JSON Parse failed, attempting fallback split", rawContent);
+        } catch (error) {
+            console.warn("JSON Parse failed, attempting fallback split", rawContent, error);
             // Fallback: assume line split is just suggestions, but filter out anything that looks like code/JSON
             let fallbackSuggestions = rawContent.split('\n')
                 .map(cleanText)
@@ -259,7 +259,7 @@ export async function generateSuggestions(history: string, currentUtterance: str
                 return [item];
             };
 
-            let expandedFallback: string[] = [];
+            const expandedFallback: string[] = [];
             for (const suggestion of fallbackSuggestions) {
                 expandedFallback.push(...splitIfNeeded(suggestion));
             }
@@ -278,7 +278,7 @@ export async function generateSuggestions(history: string, currentUtterance: str
 
             // Apply yes/no question logic to fallback as well
             if (isYesNoQuestion(correctedText)) {
-                let finalSuggestions: string[] = [];
+                const finalSuggestions: string[] = [];
                 finalSuggestions.push('Yes');
                 finalSuggestions.push('No');
                 

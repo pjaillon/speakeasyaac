@@ -10,7 +10,7 @@ export class SpeechManager {
     }
 
     private initRecognition() {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        const SpeechRecognition = SpeechManager.getSpeechRecognitionConstructor();
         if (!SpeechRecognition) {
             console.error("Speech Recognition not supported in this browser.");
             return;
@@ -46,8 +46,8 @@ export class SpeechManager {
                 setTimeout(() => {
                     try {
                         recognition.start();
-                    } catch (e) {
-                        console.warn("Failed to restart recognition", e);
+                    } catch (error) {
+                        console.warn("Failed to restart recognition", error);
                     }
                 }, 100);
             }
@@ -62,8 +62,8 @@ export class SpeechManager {
         try {
             this.recognition.start();
             this.isListening = true;
-        } catch (e) {
-            console.error("Could not start recognition:", e);
+        } catch (error) {
+            console.error("Could not start recognition:", error);
         }
     }
 
@@ -107,5 +107,15 @@ export class SpeechManager {
         }
 
         window.speechSynthesis.speak(utterance);
+    }
+
+    private static getSpeechRecognitionConstructor(): (new () => SpeechRecognition) | null {
+        type WindowWithSpeechRecognition = Window & {
+            SpeechRecognition?: new () => SpeechRecognition;
+            webkitSpeechRecognition?: new () => SpeechRecognition;
+        };
+
+        const typedWindow = window as WindowWithSpeechRecognition;
+        return typedWindow.SpeechRecognition ?? typedWindow.webkitSpeechRecognition ?? null;
     }
 }

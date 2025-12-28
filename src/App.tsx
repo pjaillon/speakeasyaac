@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SpeechManager } from './services/speech';
 import { generateSuggestions, isMockMode } from './services/llm';
 import { TranscriptionStream, type Message } from './components/TranscriptionStream';
@@ -9,49 +9,191 @@ import { CategoryFilter } from './components/CategoryFilter';
 import { PhraseHistory } from './components/PhraseHistory';
 import { CustomPhrasesPanel } from './components/CustomPhrasesPanel';
 
+type SuggestionVariant = 'default' | 'uncertainty';
+type Suggestion = { text: string; variant: SuggestionVariant };
+type VoiceGender = 'female' | 'male';
+type FontSizePreset = 'small' | 'medium' | 'large';
+type Category = 'auto' | 'food' | 'comfort' | 'general' | 'yes-no' | 'help';
+
+const STORAGE_KEYS = {
+  favorites: 'speakeasy_favorites',
+  customPhrases: 'speakeasy_custom_phrases',
+  phraseHistory: 'speakeasy_phrase_history',
+  fontSize: 'speakeasy_font_size'
+} as const;
+
+const DEFAULT_SUGGESTIONS: Suggestion[] = [
+  { text: 'Yes', variant: 'default' },
+  { text: 'No', variant: 'default' },
+  { text: 'Thank you', variant: 'default' },
+  { text: 'Please', variant: 'default' },
+  { text: 'I need help', variant: 'default' },
+  { text: 'Wait', variant: 'default' },
+  { text: "I don't know", variant: 'uncertainty' }
+];
+
+const CATEGORY_SUGGESTIONS: Record<Exclude<Category, 'auto'>, Suggestion[]> = {
+  'yes-no': [
+    { text: 'Yes', variant: 'default' },
+    { text: 'No', variant: 'default' },
+    { text: 'Maybe', variant: 'uncertainty' },
+    { text: 'I am not sure', variant: 'uncertainty' },
+  ],
+  food: [
+    { text: 'Pizza', variant: 'default' },
+    { text: 'Tacos', variant: 'default' },
+    { text: 'Salad', variant: 'default' },
+    { text: 'Sandwich', variant: 'default' },
+    { text: 'Pasta', variant: 'default' },
+    { text: 'Burger', variant: 'default' },
+    { text: 'Water', variant: 'default' },
+    { text: 'Not hungry', variant: 'uncertainty' },
+  ],
+  comfort: [
+    { text: 'I am cold', variant: 'default' },
+    { text: 'I am hot', variant: 'default' },
+    { text: 'I am tired', variant: 'default' },
+    { text: 'I need a break', variant: 'default' },
+    { text: 'Can you help?', variant: 'default' },
+    { text: 'That hurts', variant: 'default' },
+    { text: 'More please', variant: 'default' },
+    { text: 'I am okay', variant: 'uncertainty' },
+  ],
+  general: [
+    { text: 'Yes', variant: 'default' },
+    { text: 'No', variant: 'default' },
+    { text: 'Thank you', variant: 'default' },
+    { text: 'Please', variant: 'default' },
+    { text: 'Hello', variant: 'default' },
+    { text: 'Goodbye', variant: 'default' },
+    { text: 'Sorry', variant: 'default' },
+    { text: 'I do not know', variant: 'uncertainty' },
+  ],
+  help: [
+    { text: 'I need help', variant: 'default' },
+    { text: 'Emergency', variant: 'default' },
+    { text: 'Call doctor', variant: 'default' },
+    { text: 'Call 911', variant: 'default' },
+    { text: 'Something is wrong', variant: 'default' },
+    { text: 'Get someone', variant: 'default' },
+    { text: 'Hurry!', variant: 'default' },
+    { text: 'Please wait', variant: 'uncertainty' },
+  ],
+};
+
+const FONT_SIZE_MAP: Record<FontSizePreset, number> = {
+  small: 0.875,
+  medium: 1,
+  large: 1.5,
+};
+
+const safeLocalStorageGet = (key: string) => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(key);
+  } catch (error) {
+    console.warn(`Failed to read ${key} from localStorage`, error);
+    return null;
+  }
+};
+
+const safeLocalStorageSet = (key: string, value: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {
+    console.warn(`Failed to write ${key} to localStorage`, error);
+  }
+};
+
+const readJSONFromStorage = <T,>(key: string, fallback: T): T => {
+  const raw = safeLocalStorageGet(key);
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch (error) {
+    console.warn(`Failed to parse ${key} from localStorage`, error);
+    return fallback;
+  }
+};
+
+const writeJSONToStorage = (key: string, value: unknown) => {
+  safeLocalStorageSet(key, JSON.stringify(value));
+};
+
+const getDefaultSuggestions = (): Suggestion[] => DEFAULT_SUGGESTIONS.map(s => ({ ...s }));
+
+const getStoredFontSizePreset = (): FontSizePreset => {
+  const stored = safeLocalStorageGet(STORAGE_KEYS.fontSize);
+  if (stored === 'small' || stored === 'medium' || stored === 'large') {
+    return stored;
+  }
+  return 'medium';
+};
+
+const detectContextCategory = (text: string): Category => {
+  const lower = text.toLowerCase();
+
+  const foodKeywords = ['food', 'eat', 'hungry', 'thirsty', 'drink', 'salad', 'pizza', 'burger', 'want', 'like', 'taste', 'meal', 'dinner', 'lunch', 'breakfast'];
+  if (foodKeywords.some(kw => lower.includes(kw))) return 'food';
+
+  const comfortKeywords = ['hurt', 'pain', 'cold', 'hot', 'tired', 'sleep', 'comfortable', 'scared', 'sad', 'happy', 'mood', 'feel', 'fever', 'ache'];
+  if (comfortKeywords.some(kw => lower.includes(kw))) return 'comfort';
+
+  const helpKeywords = ['help', 'emergency', 'call', 'doctor', 'hospital', 'urgent', '911', 'need', 'sick', 'problem'];
+  if (helpKeywords.some(kw => lower.includes(kw))) return 'help';
+
+  if (/^(is|are|am|was|were|do|does|did|have|has|had|can|could|will|would|should|may|might|must)\s/i.test(lower)) {
+    return 'yes-no';
+  }
+
+  return 'auto';
+};
+
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [interim, setInterim] = useState('');
-  const [suggestions, setSuggestions] = useState<Array<{ text: string, variant: 'default' | 'uncertainty' }>>([
-    { text: "Yes", variant: 'default' },
-    { text: "No", variant: 'default' },
-    { text: "Thank you", variant: 'default' },
-    { text: "Please", variant: 'default' },
-    { text: "I need help", variant: 'default' },
-    { text: "Wait", variant: 'default' },
-    { text: "I don't know", variant: 'uncertainty' }
-  ]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>(() => getDefaultSuggestions());
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Voice Selection State
-  const [voiceGender, setVoiceGender] = useState<'female' | 'male'>('female');
+  const [voiceGender, setVoiceGender] = useState<VoiceGender>('female');
   
   // Font Size State ('small' | 'medium' | 'large')
-  const [fontSizePreset, setFontSizePreset] = useState<'small' | 'medium' | 'large'>('medium');
-  
-  // Map preset to actual rem value
-  const fontSizeMap = { small: 0.875, medium: 1, large: 1.5 };
-  const fontSize = fontSizeMap[fontSizePreset];
+  const [fontSizePreset, setFontSizePreset] = useState<FontSizePreset>(() => getStoredFontSizePreset());
+  const fontSize = FONT_SIZE_MAP[fontSizePreset];
 
   // Favorites, Custom Phrases, History, and Category state
-  const [favorites, setFavorites] = useState<string[]>(() => {
-    const saved = localStorage.getItem('speakeasy_favorites');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [customPhrases, setCustomPhrases] = useState<string[]>(() => {
-    const saved = localStorage.getItem('speakeasy_custom_phrases');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [phraseHistory, setPhraseHistory] = useState<string[]>(() => {
-    const saved = localStorage.getItem('speakeasy_phrase_history');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [favorites, setFavorites] = useState<string[]>(() => readJSONFromStorage<string[]>(STORAGE_KEYS.favorites, []));
+  const [customPhrases, setCustomPhrases] = useState<string[]>(() => readJSONFromStorage<string[]>(STORAGE_KEYS.customPhrases, []));
+  const [phraseHistory, setPhraseHistory] = useState<string[]>(() => readJSONFromStorage<string[]>(STORAGE_KEYS.phraseHistory, []));
   const [showCustomPanel, setShowCustomPanel] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<'auto' | 'food' | 'comfort' | 'general' | 'yes-no' | 'help'>('auto');
+  const [activeCategory, setActiveCategory] = useState<Category>('auto');
 
   const speechManagerRef = useRef<SpeechManager | null>(null);
+  const activeCategoryRef = useRef<Category>(activeCategory);
+
+  useEffect(() => {
+    writeJSONToStorage(STORAGE_KEYS.favorites, favorites);
+  }, [favorites]);
+
+  useEffect(() => {
+    writeJSONToStorage(STORAGE_KEYS.customPhrases, customPhrases);
+  }, [customPhrases]);
+
+  useEffect(() => {
+    writeJSONToStorage(STORAGE_KEYS.phraseHistory, phraseHistory);
+  }, [phraseHistory]);
+
+  useEffect(() => {
+    safeLocalStorageSet(STORAGE_KEYS.fontSize, fontSizePreset);
+  }, [fontSizePreset]);
+
+  useEffect(() => {
+    activeCategoryRef.current = activeCategory;
+  }, [activeCategory]);
 
   // Ref to access latest messages in callback without re-binding
   const messagesRef = useRef<Message[]>([]);
@@ -88,7 +230,7 @@ function App() {
         }
 
         // Auto-detect category when in auto mode
-        if (activeCategory === 'auto' && correctedText) {
+        if (activeCategoryRef.current === 'auto' && correctedText) {
           const detectedCategory = detectContextCategory(correctedText);
           if (detectedCategory !== 'auto') {
             setActiveCategory(detectedCategory);
@@ -99,9 +241,10 @@ function App() {
           const structuredSuggestions = newSuggestions.map(s => ({ text: s, variant: 'default' as const }));
           setSuggestions(structuredSuggestions);
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error(err);
-        setErrorMsg(err.message || "Failed to generate suggestions");
+        const message = err instanceof Error ? err.message : 'Failed to generate suggestions';
+        setErrorMsg(message);
       } finally {
         setIsLoading(false);
       }
@@ -131,128 +274,40 @@ function App() {
     setVoiceGender(prev => prev === 'female' ? 'male' : 'female');
   };
 
-  const setFontSize = (preset: 'small' | 'medium' | 'large') => {
+  const setFontSize = (preset: FontSizePreset) => {
     setFontSizePreset(preset);
   };
 
   const addToFavorites = (phrase: string) => {
-    const updated = [...new Set([...favorites, phrase])];
-    setFavorites(updated);
-    localStorage.setItem('speakeasy_favorites', JSON.stringify(updated));
+    setFavorites(prev => [...new Set([...prev, phrase])]);
   };
 
   const removeFromFavorites = (phrase: string) => {
-    const updated = favorites.filter(f => f !== phrase);
-    setFavorites(updated);
-    localStorage.setItem('speakeasy_favorites', JSON.stringify(updated));
+    setFavorites(prev => prev.filter(f => f !== phrase));
   };
 
   const addCustomPhrase = (phrase: string) => {
-    const updated = [...new Set([...customPhrases, phrase])];
-    setCustomPhrases(updated);
-    localStorage.setItem('speakeasy_custom_phrases', JSON.stringify(updated));
+    setCustomPhrases(prev => [...new Set([...prev, phrase])]);
   };
 
   const removeCustomPhrase = (phrase: string) => {
-    const updated = customPhrases.filter(p => p !== phrase);
-    setCustomPhrases(updated);
-    localStorage.setItem('speakeasy_custom_phrases', JSON.stringify(updated));
+    setCustomPhrases(prev => prev.filter(p => p !== phrase));
   };
 
   const addToHistory = (phrase: string) => {
-    const updated = [phrase, ...phraseHistory.filter(p => p !== phrase)].slice(0, 20);
-    setPhraseHistory(updated);
-    localStorage.setItem('speakeasy_phrase_history', JSON.stringify(updated));
+    setPhraseHistory(prev => [phrase, ...prev.filter(p => p !== phrase)].slice(0, 20));
   };
 
   const clearHistory = () => {
     setPhraseHistory([]);
-    localStorage.removeItem('speakeasy_phrase_history');
   };
 
-  // Detect context from user's sentence
-  const detectContextCategory = (text: string): 'food' | 'comfort' | 'general' | 'yes-no' | 'help' | 'auto' => {
-    const lower = text.toLowerCase();
-    
-    // Food keywords
-    const foodKeywords = ['food', 'eat', 'hungry', 'thirsty', 'drink', 'salad', 'pizza', 'burger', 'want', 'like', 'taste', 'meal', 'dinner', 'lunch', 'breakfast'];
-    if (foodKeywords.some(kw => lower.includes(kw))) return 'food';
-    
-    // Comfort keywords (pain, temperature, mood)
-    const comfortKeywords = ['hurt', 'pain', 'cold', 'hot', 'tired', 'sleep', 'comfortable', 'scared', 'sad', 'happy', 'mood', 'feel', 'fever', 'ache'];
-    if (comfortKeywords.some(kw => lower.includes(kw))) return 'comfort';
-    
-    // Help keywords
-    const helpKeywords = ['help', 'emergency', 'call', 'doctor', 'hospital', 'urgent', '911', 'need', 'sick', 'problem'];
-    if (helpKeywords.some(kw => lower.includes(kw))) return 'help';
-    
-    // Yes/no questions are already handled in llm.ts
-    if (/^(is|are|am|was|were|do|does|did|have|has|had|can|could|will|would|should|may|might|must)\s/i.test(lower)) {
-      return 'yes-no';
+  const filteredSuggestions = useMemo(() => {
+    if (activeCategory === 'auto') {
+      return suggestions;
     }
-    
-    return 'auto';
-  };
-
-  // Category-specific suggestion sets
-  const getCategorySuggestions = () => {
-    const categorySets: Record<string, Array<{ text: string, variant: 'default' | 'uncertainty' }>> = {
-      'auto': suggestions, // Use AI-generated suggestions
-      'yes-no': [
-        { text: 'Yes', variant: 'default' },
-        { text: 'No', variant: 'default' },
-        { text: 'Maybe', variant: 'uncertainty' },
-        { text: "I am not sure", variant: 'uncertainty' },
-      ],
-      'food': [
-        { text: 'Pizza', variant: 'default' },
-        { text: 'Tacos', variant: 'default' },
-        { text: 'Salad', variant: 'default' },
-        { text: 'Sandwich', variant: 'default' },
-        { text: 'Pasta', variant: 'default' },
-        { text: 'Burger', variant: 'default' },
-        { text: 'Water', variant: 'default' },
-        { text: "Not hungry", variant: 'uncertainty' },
-      ],
-      'comfort': [
-        { text: "I am cold", variant: 'default' },
-        { text: "I am hot", variant: 'default' },
-        { text: "I am tired", variant: 'default' },
-        { text: 'I need a break', variant: 'default' },
-        { text: 'Can you help?', variant: 'default' },
-        { text: 'That hurts', variant: 'default' },
-        { text: 'More please', variant: 'default' },
-        { text: "I am okay", variant: 'uncertainty' },
-      ],
-      'general': [
-        { text: 'Yes', variant: 'default' },
-        { text: 'No', variant: 'default' },
-        { text: 'Thank you', variant: 'default' },
-        { text: 'Please', variant: 'default' },
-        { text: 'Hello', variant: 'default' },
-        { text: 'Goodbye', variant: 'default' },
-        { text: 'Sorry', variant: 'default' },
-        { text: "I do not know", variant: 'uncertainty' },
-      ],
-      'help': [
-        { text: 'I need help', variant: 'default' },
-        { text: 'Emergency', variant: 'default' },
-        { text: 'Call doctor', variant: 'default' },
-        { text: 'Call 911', variant: 'default' },
-        { text: 'Something is wrong', variant: 'default' },
-        { text: 'Get someone', variant: 'default' },
-        { text: 'Hurry!', variant: 'default' },
-        { text: 'Please wait', variant: 'uncertainty' },
-      ],
-    };
-
-    return categorySets[activeCategory] || categorySets['general'];
-  };
-
-  // Filter suggestions based on active category
-  const getFilteredSuggestions = () => {
-    return getCategorySuggestions();
-  };
+    return CATEGORY_SUGGESTIONS[activeCategory] ?? CATEGORY_SUGGESTIONS.general;
+  }, [activeCategory, suggestions]);
 
   const handleTileClick = (text: string) => {
     // 1. Speak it with selected gender
@@ -274,28 +329,12 @@ function App() {
     // Clear all state
     setMessages([]);
     setInterim('');
-    setSuggestions([
-      { text: "Yes", variant: 'default' },
-      { text: "No", variant: 'default' },
-      { text: "Thank you", variant: 'default' },
-      { text: "Please", variant: 'default' },
-      { text: "I need help", variant: 'default' },
-      { text: "Wait", variant: 'default' },
-      { text: "I don't know", variant: 'uncertainty' }
-    ]);
+    setSuggestions(getDefaultSuggestions());
     setErrorMsg(null);
     setFontSizePreset('medium');
     setActiveCategory('auto');
     setShowCustomPanel(false);
     setVoiceGender('female');
-    
-    // Clear all localStorage
-    localStorage.removeItem('speakeasy_favorites');
-    localStorage.removeItem('speakeasy_custom_phrases');
-    localStorage.removeItem('speakeasy_phrase_history');
-    localStorage.removeItem('speakeasy_font_size');
-    
-    // Update state
     setFavorites([]);
     setCustomPhrases([]);
     setPhraseHistory([]);
@@ -358,7 +397,7 @@ function App() {
               </button>
             </div>
             <ResponseGrid
-              suggestions={getFilteredSuggestions()}
+              suggestions={filteredSuggestions}
               onSelect={handleTileClick}
               isLoading={isLoading}
               onAddFavorite={addToFavorites}
