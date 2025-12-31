@@ -1,6 +1,6 @@
 import React from 'react';
 
-type Category = 'auto' | 'food' | 'comfort' | 'general' | 'yes-no' | 'help';
+type Category = 'auto' | 'food' | 'comfort' | 'general' | 'yes-no' | 'help' | 'numbers';
 
 interface Props {
     activeCategory: Category;
@@ -14,6 +14,7 @@ export const CategoryFilter: React.FC<Props> = ({ activeCategory, onCategoryChan
         { id: 'comfort', label: 'Comfort', emoji: '😌' },
         { id: 'general', label: 'General', emoji: '💬' },
         { id: 'yes-no', label: 'Yes/No', emoji: '❓' },
+        { id: 'numbers', label: 'Numbers', emoji: '🔢' },
         { id: 'help', label: 'Help', emoji: '🆘' },
     ];
 

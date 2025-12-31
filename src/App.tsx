@@ -13,7 +13,7 @@ type SuggestionVariant = 'default' | 'uncertainty';
 type Suggestion = { text: string; variant: SuggestionVariant };
 type VoiceGender = 'female' | 'male';
 type FontSizePreset = 'small' | 'medium' | 'large';
-type Category = 'auto' | 'food' | 'comfort' | 'general' | 'yes-no' | 'help';
+type Category = 'auto' | 'food' | 'comfort' | 'general' | 'yes-no' | 'help' | 'numbers';
 
 const STORAGE_KEYS = {
   favorites: 'speakeasy_favorites',
@@ -32,7 +32,7 @@ const DEFAULT_SUGGESTIONS: Suggestion[] = [
   { text: "I don't know", variant: 'uncertainty' }
 ];
 
-const CATEGORY_SUGGESTIONS: Record<Exclude<Category, 'auto'>, Suggestion[]> = {
+const CATEGORY_SUGGESTIONS: Record<Exclude<Category, 'auto' | 'numbers'>, Suggestion[]> = {
   'yes-no': [
     { text: 'Yes', variant: 'default' },
     { text: 'No', variant: 'default' },
@@ -81,11 +81,65 @@ const CATEGORY_SUGGESTIONS: Record<Exclude<Category, 'auto'>, Suggestion[]> = {
   ],
 };
 
+const NUMBER_SUGGESTIONS: Suggestion[] = [
+  { text: '1', variant: 'default' },
+  { text: '2', variant: 'default' },
+  { text: '3', variant: 'default' },
+  { text: '4', variant: 'default' },
+  { text: '5', variant: 'default' },
+  { text: '6', variant: 'default' },
+  { text: '7', variant: 'default' },
+  { text: '8', variant: 'default' },
+  { text: '9', variant: 'default' },
+  { text: '0', variant: 'default' },
+  { text: 'Del', variant: 'uncertainty' },
+  { text: 'Enter', variant: 'default' },
+];
+
 const FONT_SIZE_MAP: Record<FontSizePreset, number> = {
   small: 0.875,
   medium: 1,
   large: 1.5,
 };
+
+const NUMBER_UNITS = [
+  {
+    keywords: ['mile', 'miles', 'distance', 'far', 'drive', 'walk', 'km', 'kilometer', 'kilometre'],
+    units: ['miles', 'km', 'ft'],
+  },
+  {
+    keywords: ['weight', 'weigh', 'heavy', 'light', 'lbs', 'pound', 'kg', 'kilogram'],
+    units: ['lbs', 'kg'],
+  },
+  {
+    keywords: ['height', 'tall', 'length', 'long', 'width', 'size', 'inch', 'inches', 'cm', 'centimeter', 'centimetre'],
+    units: ['cm', 'in', 'ft'],
+  },
+  {
+    keywords: ['temperature', 'temp', 'degree', 'degrees', 'fahrenheit', 'celsius'],
+    units: ['°F', '°C'],
+  },
+  {
+    keywords: ['time', 'minute', 'minutes', 'hour', 'hours', 'day', 'days', 'week', 'weeks', 'month', 'months', 'year', 'years'],
+    units: ['min', 'hours', 'days'],
+  },
+  {
+    keywords: ['price', 'cost', 'dollar', 'dollars', 'cent', 'cents', 'money', 'pay'],
+    units: ['$', 'dollars', 'cents'],
+  },
+  {
+    keywords: ['speed', 'mph', 'km/h'],
+    units: ['mph', 'km/h'],
+  },
+  {
+    keywords: ['percent', 'percentage', '%'],
+    units: ['%'],
+  },
+  {
+    keywords: ['volume', 'drink', 'water', 'milk', 'oz', 'ounce', 'ml', 'liter', 'litre', 'cup', 'cups'],
+    units: ['oz', 'ml', 'cups'],
+  },
+] as const;
 
 const safeLocalStorageGet = (key: string) => {
   if (typeof window === 'undefined') return null;
@@ -131,8 +185,30 @@ const getStoredFontSizePreset = (): FontSizePreset => {
   return 'medium';
 };
 
+const isNumberRelatedQuestion = (text: string) => {
+  const lower = text.toLowerCase();
+  const hasNumberSignal = /\d/.test(lower) ||
+    /\b(how many|how much|number|amount|quantity|percent|percentage|weight|weigh|distance|far|length|long|tall|height|width|size|speed|temperature|degree|degrees|age|old|time|minute|minutes|hour|hours|day|days|cost|price|dollar|dollars|cent|cents|pay|fee|rate)\b/i.test(lower);
+  if (!hasNumberSignal) return false;
+
+  return /\?$/.test(text.trim()) ||
+    /\b(how many|how much|what number|which number|what amount|what time|how long|how far|how tall|how old|how big|how heavy|how fast)\b/i.test(lower);
+};
+
+const getContextualUnits = (contextText: string) => {
+  const lower = contextText.toLowerCase();
+  const match = NUMBER_UNITS.find(entry => entry.keywords.some(keyword => lower.includes(keyword)));
+  if (match) {
+    return match.units;
+  }
+  return ['cm', 'in', 'lbs', 'kg', '%'];
+};
+
+
 const detectContextCategory = (text: string): Category => {
   const lower = text.toLowerCase();
+
+  if (isNumberRelatedQuestion(text)) return 'numbers';
 
   const foodKeywords = ['food', 'eat', 'hungry', 'thirsty', 'drink', 'salad', 'pizza', 'burger', 'want', 'like', 'taste', 'meal', 'dinner', 'lunch', 'breakfast'];
   if (foodKeywords.some(kw => lower.includes(kw))) return 'food';
@@ -171,9 +247,13 @@ function App() {
   const [phraseHistory, setPhraseHistory] = useState<string[]>(() => readJSONFromStorage<string[]>(STORAGE_KEYS.phraseHistory, []));
   const [showCustomPanel, setShowCustomPanel] = useState(false);
   const [activeCategory, setActiveCategory] = useState<Category>('auto');
+  const [numericInput, setNumericInput] = useState('');
+  const [numericUnit, setNumericUnit] = useState('');
+  const [lastUtterance, setLastUtterance] = useState('');
 
   const speechManagerRef = useRef<SpeechManager | null>(null);
   const activeCategoryRef = useRef<Category>(activeCategory);
+  const autoDetectedCategoryRef = useRef(false);
 
   useEffect(() => {
     writeJSONToStorage(STORAGE_KEYS.favorites, favorites);
@@ -193,6 +273,13 @@ function App() {
 
   useEffect(() => {
     activeCategoryRef.current = activeCategory;
+  }, [activeCategory]);
+
+  useEffect(() => {
+    if (activeCategory !== 'numbers') {
+      setNumericInput('');
+      setNumericUnit('');
+    }
   }, [activeCategory]);
 
   // Ref to access latest messages in callback without re-binding
@@ -229,11 +316,23 @@ function App() {
           });
         }
 
-        // Auto-detect category when in auto mode
-        if (activeCategoryRef.current === 'auto' && correctedText) {
-          const detectedCategory = detectContextCategory(correctedText);
-          if (detectedCategory !== 'auto') {
-            setActiveCategory(detectedCategory);
+        if (correctedText || text) {
+          const normalizedText = correctedText || text;
+          setLastUtterance(normalizedText);
+          const detectedCategory = detectContextCategory(normalizedText);
+          if (activeCategoryRef.current === 'auto') {
+            if (detectedCategory !== 'auto') {
+              autoDetectedCategoryRef.current = true;
+              setActiveCategory(detectedCategory);
+            }
+          } else if (autoDetectedCategoryRef.current) {
+            if (detectedCategory === 'auto') {
+              autoDetectedCategoryRef.current = false;
+              setActiveCategory('auto');
+            } else if (detectedCategory !== activeCategoryRef.current) {
+              autoDetectedCategoryRef.current = true;
+              setActiveCategory(detectedCategory);
+            }
           }
         }
 
@@ -278,6 +377,43 @@ function App() {
     setFontSizePreset(preset);
   };
 
+  const handleCategoryChange = (category: Category) => {
+    autoDetectedCategoryRef.current = false;
+    setActiveCategory(category);
+  };
+
+  const handleNumberTile = (text: string) => {
+    if (/^\d$/.test(text)) {
+      setNumericInput(prev => `${prev}${text}`);
+      return;
+    }
+
+    if (text === 'Del') {
+      if (numericInput.length > 0) {
+        setNumericInput(prev => prev.slice(0, -1));
+      } else {
+        setNumericUnit('');
+      }
+      return;
+    }
+
+    if (text === 'Enter') {
+      if (numericInput.trim().length === 0) return;
+      const spokenValue = numericUnit ? `${numericInput} ${numericUnit}` : numericInput;
+      handleTileClick(spokenValue);
+      setNumericInput('');
+      setNumericUnit('');
+    }
+  };
+
+  const handleSuggestionSelect = (text: string) => {
+    if (activeCategory === 'numbers') {
+      handleNumberTile(text);
+      return;
+    }
+    handleTileClick(text);
+  };
+
   const addToFavorites = (phrase: string) => {
     setFavorites(prev => [...new Set([...prev, phrase])]);
   };
@@ -306,8 +442,13 @@ function App() {
     if (activeCategory === 'auto') {
       return suggestions;
     }
+    if (activeCategory === 'numbers') {
+      return NUMBER_SUGGESTIONS;
+    }
     return CATEGORY_SUGGESTIONS[activeCategory] ?? CATEGORY_SUGGESTIONS.general;
   }, [activeCategory, suggestions]);
+
+  const unitOptions = useMemo(() => getContextualUnits(lastUtterance), [lastUtterance]);
 
   const handleTileClick = (text: string) => {
     // 1. Speak it with selected gender
@@ -335,6 +476,10 @@ function App() {
     setActiveCategory('auto');
     setShowCustomPanel(false);
     setVoiceGender('female');
+    autoDetectedCategoryRef.current = false;
+    setNumericInput('');
+    setNumericUnit('');
+    setLastUtterance('');
     setFavorites([]);
     setCustomPhrases([]);
     setPhraseHistory([]);
@@ -383,7 +528,7 @@ function App() {
             onRemoveFavorite={removeFromFavorites}
           />
 
-          <CategoryFilter activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
+          <CategoryFilter activeCategory={activeCategory} onCategoryChange={handleCategoryChange} />
 
           <div className="flex-none">
             <div className="flex justify-between items-center mb-3">
@@ -396,12 +541,34 @@ function App() {
                 + Custom
               </button>
             </div>
+            {activeCategory === 'numbers' && (
+              <div className="mb-3 rounded-lg border border-indigo-200/60 dark:border-indigo-800/60 bg-indigo-50/80 dark:bg-indigo-950/40 px-4 py-3">
+                <div className="text-indigo-700 dark:text-indigo-200 font-semibold">
+                  Number: {numericInput || '—'}{numericUnit ? ` ${numericUnit}` : ''}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {unitOptions.map(unit => (
+                    <button
+                      key={unit}
+                      onClick={() => setNumericUnit(prev => prev === unit ? '' : unit)}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                        numericUnit === unit
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200 hover:bg-indigo-200 dark:hover:bg-indigo-800'
+                      }`}
+                    >
+                      {unit}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <ResponseGrid
               suggestions={filteredSuggestions}
-              onSelect={handleTileClick}
+              onSelect={handleSuggestionSelect}
               isLoading={isLoading}
-              onAddFavorite={addToFavorites}
-              isFavorite={(text) => favorites.includes(text)}
+              onAddFavorite={activeCategory === 'numbers' ? undefined : addToFavorites}
+              isFavorite={activeCategory === 'numbers' ? undefined : (text) => favorites.includes(text)}
             />
           </div>
 
