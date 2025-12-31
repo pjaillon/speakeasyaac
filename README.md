@@ -9,6 +9,10 @@ A modern, AI-powered Augmentative and Alternative Communication (AAC) web applic
 - **Automatic Punctuation** - Intelligent punctuation detection for questions, exclamations, and statements
 - **Text-to-Speech** - Speak suggested responses with selectable voice (male/female)
 - **Conversation History** - View full message history with user and assistant messages
+- **Favorites & Custom Phrases** - Save frequently used responses and manage your own phrase list
+- **Category Filters** - Quickly switch between Auto, Food, Comfort, General, Yes/No, Numbers, and Help
+- **Numbers Keypad** - Build a number with 0–9, choose a contextual unit, and tap Enter to speak it
+- **Phrase History** - Recent selections are stored for quick reuse
 - **Responsive Design** - Mobile-friendly UI with dark mode support
 - **Mock Mode** - Works without API key using pre-defined suggestions
 
@@ -74,8 +78,11 @@ npm run preview
 ```
 src/
 ├── components/
-│   ├── ControlBar.tsx       # Recording control & voice selection
+│   ├── ControlBar.tsx        # Recording control & voice selection
 │   ├── ResponseGrid.tsx      # Suggestion tiles
+│   ├── CategoryFilter.tsx    # Category selector
+│   ├── FavoritePhrases.tsx   # Favorites panel
+│   ├── PhraseHistory.tsx     # Recent phrases
 │   └── TranscriptionStream.tsx # Message display
 ├── services/
 │   ├── llm.ts              # OpenAI API integration & punctuation
@@ -93,6 +100,14 @@ src/
 5. **Suggestions** - AI generates 6-8 contextual response options
 6. **User selects** - User clicks a suggestion tile to speak it aloud
 7. **Message added** - Selected text is added to conversation history
+
+## Numbers Mode
+
+Switch to the **Numbers** category to enter a custom number using a keypad (0–9), optionally pick a contextual unit (cm, kg, %, etc.), and press **Enter** to speak the composed value (e.g., `124 cm`).
+
+## Persistence
+
+Favorites, custom phrases, phrase history, and font size are stored in `localStorage` so preferences survive reloads.
 
 ## Features in Detail
 
