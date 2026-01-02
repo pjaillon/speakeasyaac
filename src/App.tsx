@@ -226,6 +226,75 @@ const detectContextCategory = (text: string): Category => {
   return 'auto';
 };
 
+const getBinaryOptionsFromText = (text: string) => {
+  const sentence = text
+    .split(/[?.!]/)
+    .map(part => part.trim())
+    .filter(Boolean)
+    .slice(-1)[0];
+  if (!sentence || !/\bor\b/i.test(sentence)) return [] as string[];
+
+  const parts = sentence.split(/\bor\b/i).map(part => part.trim()).filter(Boolean);
+  if (parts.length < 2) return [] as string[];
+
+  const left = parts[parts.length - 2];
+  const right = parts[parts.length - 1];
+  const trimPunctuation = (value: string) => value.replace(/^[^\w]+|[^\w]+$/g, '').trim();
+  const stopWords = new Set([
+    'who', 'what', 'which', 'is', 'are', 'am', 'was', 'were', 'do', 'does', 'did',
+    'can', 'could', 'will', 'would', 'should', 'may', 'might', 'must', 'the', 'a', 'an',
+    'your', 'my', 'our', 'their', 'his', 'her', 'preferred', 'favorite', 'favourite',
+    'child', 'person', 'pet', 'option', 'choice', 'choose', 'pick', 'one'
+  ]);
+
+  const scrubOption = (value: string) => {
+    const tokens = trimPunctuation(value).split(/\s+/).filter(Boolean);
+    while (tokens.length > 1 && stopWords.has(tokens[0].toLowerCase())) {
+      tokens.shift();
+    }
+    return trimPunctuation(tokens.join(' '));
+  };
+
+  const leftOption = scrubOption(left);
+  const rightOption = scrubOption(right);
+
+  if (!leftOption || !rightOption) return [] as string[];
+  return [leftOption, rightOption];
+};
+
+const ensureBinarySuggestions = (text: string, suggestions: string[]) => {
+  const normalized = (value: string) => value.trim().toLowerCase();
+  const existing = new Set(suggestions.map(normalized));
+  const next = [...suggestions];
+
+  const options = getBinaryOptionsFromText(text);
+  if (options.length === 2) {
+    options.forEach(option => {
+      if (!existing.has(normalized(option))) {
+        next.unshift(option);
+        existing.add(normalized(option));
+      }
+    });
+    const neutralOption = "Can't choose";
+    if (!existing.has(normalized(neutralOption))) {
+      next.push(neutralOption);
+      existing.add(normalized(neutralOption));
+    }
+    return next;
+  }
+
+  if (detectContextCategory(text) === 'yes-no') {
+    ['Yes', 'No'].reverse().forEach(option => {
+      if (!existing.has(normalized(option))) {
+        next.unshift(option);
+        existing.add(normalized(option));
+      }
+    });
+  }
+
+  return next;
+};
+
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [interim, setInterim] = useState('');
@@ -316,28 +385,26 @@ function App() {
           });
         }
 
-        if (correctedText || text) {
-          const normalizedText = correctedText || text;
+        const normalizedText = correctedText || text;
+        if (normalizedText) {
           setLastUtterance(normalizedText);
           const detectedCategory = detectContextCategory(normalizedText);
-          if (activeCategoryRef.current === 'auto') {
-            if (detectedCategory !== 'auto') {
-              autoDetectedCategoryRef.current = true;
-              setActiveCategory(detectedCategory);
-            }
-          } else if (autoDetectedCategoryRef.current) {
-            if (detectedCategory === 'auto') {
+          if (detectedCategory === 'auto') {
+            if (autoDetectedCategoryRef.current && activeCategoryRef.current !== 'auto') {
               autoDetectedCategoryRef.current = false;
               setActiveCategory('auto');
-            } else if (detectedCategory !== activeCategoryRef.current) {
-              autoDetectedCategoryRef.current = true;
+            }
+          } else {
+            autoDetectedCategoryRef.current = true;
+            if (detectedCategory !== activeCategoryRef.current) {
               setActiveCategory(detectedCategory);
             }
           }
         }
 
         if (newSuggestions.length > 0) {
-          const structuredSuggestions = newSuggestions.map(s => ({ text: s, variant: 'default' as const }));
+          const binaryAwareSuggestions = ensureBinarySuggestions(normalizedText, newSuggestions);
+          const structuredSuggestions = binaryAwareSuggestions.map(s => ({ text: s, variant: 'default' as const }));
           setSuggestions(structuredSuggestions);
         }
       } catch (err) {
@@ -486,36 +553,36 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-black text-gray-900 dark:text-gray-100 font-sans p-4 md:p-8 flex flex-col">
-      <header className="mb-6 flex justify-between items-center">
+    <div className="min-h-screen text-[var(--ink)] px-4 md:px-8 py-6 flex flex-col">
+      <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-500">
+          <h1 className="text-4xl md:text-5xl font-semibold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-[var(--accent-2)] via-[var(--accent)] to-[var(--accent-3)]">
             SpeakEasy
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">AI-Powered AAC Assistant</p>
+          <p className="text-sm text-[var(--ink-muted)]">AI-Powered AAC Assistant</p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={toggleVoice}
-            className="px-4 py-2 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200 rounded-lg text-sm font-semibold hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors flex items-center gap-2"
+            className="px-4 py-2 bg-[var(--surface-strong)] text-[var(--ink)] rounded-full text-sm font-semibold border border-[var(--outline)] shadow-sm hover:shadow-md transition-all flex items-center gap-2"
           >
-            <span>Voice:</span>
-            <span className="font-bold">{voiceGender === 'female' ? '👩 Female' : '👨 Male'}</span>
+            <span className="text-[var(--ink-muted)]">Voice:</span>
+            <span className="font-semibold">{voiceGender === 'female' ? '👩 Female' : '👨 Male'}</span>
           </button>
 
           {isMockMode() && (
-            <div className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-semibold border border-yellow-200">
+            <div className="bg-[rgba(242,179,75,0.2)] text-[var(--ink)] px-3 py-1 rounded-full text-xs font-semibold border border-[rgba(242,179,75,0.45)]">
               Mock Mode (No API Key)
             </div>
           )}
         </div>
       </header>
 
-      <main className="flex-1 flex gap-4 max-w-7xl mx-auto w-full h-[calc(100vh-140px)] overflow-hidden">
+      <main className="flex-1 flex flex-col lg:flex-row gap-4 max-w-7xl mx-auto w-full h-[calc(100vh-170px)] overflow-hidden">
         <div className="flex-1 flex flex-col gap-4 overflow-y-auto">
           {errorMsg && (
-            <div className="bg-red-100 text-red-700 p-4 rounded-xl border border-red-200">
+            <div className="bg-[rgba(242,109,91,0.12)] text-[var(--ink)] p-4 rounded-2xl border border-[rgba(242,109,91,0.3)]">
               Error: {errorMsg}
             </div>
           )}
@@ -532,18 +599,20 @@ function App() {
 
           <div className="flex-none">
             <div className="flex justify-between items-center mb-3">
-              <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Suggested Responses</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--ink-muted)]">
+                Suggested Responses
+              </h2>
               <button
                 onClick={() => setShowCustomPanel(true)}
-                className="text-xs px-3 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors font-semibold"
+                className="text-xs px-3 py-1 bg-[rgba(31,111,120,0.15)] text-[var(--accent-2)] rounded-full hover:bg-[rgba(31,111,120,0.25)] transition-colors font-semibold"
                 title="Manage custom phrases"
               >
                 + Custom
               </button>
             </div>
             {activeCategory === 'numbers' && (
-              <div className="mb-3 rounded-lg border border-indigo-200/60 dark:border-indigo-800/60 bg-indigo-50/80 dark:bg-indigo-950/40 px-4 py-3">
-                <div className="text-indigo-700 dark:text-indigo-200 font-semibold">
+              <div className="mb-3 rounded-2xl border border-[rgba(31,111,120,0.25)] bg-[rgba(31,111,120,0.12)] px-4 py-3">
+                <div className="text-[var(--accent-2)] font-semibold">
                   Number: {numericInput || '—'}{numericUnit ? ` ${numericUnit}` : ''}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -553,8 +622,8 @@ function App() {
                       onClick={() => setNumericUnit(prev => prev === unit ? '' : unit)}
                       className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
                         numericUnit === unit
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200 hover:bg-indigo-200 dark:hover:bg-indigo-800'
+                          ? 'bg-[var(--accent-2)] text-white'
+                          : 'bg-[rgba(31,111,120,0.16)] text-[var(--accent-2)] hover:bg-[rgba(31,111,120,0.28)]'
                       }`}
                     >
                       {unit}

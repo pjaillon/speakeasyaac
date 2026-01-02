@@ -18,7 +18,7 @@ export const ResponseGrid: React.FC<Props> = ({ suggestions, onSelect, isLoading
         return (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 h-64 animate-pulse">
                 {[...Array(8)].map((_, i) => (
-                    <div key={i} className="bg-gray-200 dark:bg-gray-700 rounded-xl"></div>
+                    <div key={i} className="bg-[rgba(28,27,31,0.08)] rounded-2xl"></div>
                 ))}
             </div>
         );
@@ -31,9 +31,9 @@ export const ResponseGrid: React.FC<Props> = ({ suggestions, onSelect, isLoading
                     <button
                         onClick={() => onSelect(item.text)}
                         className={`w-full ${item.variant === 'uncertainty'
-                                ? 'bg-sky-500 hover:bg-sky-600'
-                                : 'bg-indigo-600 hover:bg-indigo-700'
-                            } text-white font-bold py-6 px-4 rounded-xl shadow-lg transform transition active:scale-95 text-sm md:text-base break-words line-clamp-3 h-full flex items-center justify-center text-center`}
+                                ? 'bg-[var(--accent)] hover:bg-[#e25b4a]'
+                                : 'bg-[var(--accent-2)] hover:bg-[#185c64]'
+                            } text-white font-semibold py-6 px-4 rounded-2xl shadow-lg transform transition hover:-translate-y-0.5 active:translate-y-0 text-sm md:text-base break-words line-clamp-3 h-full flex items-center justify-center text-center ring-1 ring-black/5`}
                         title={item.text}
                     >
                         {item.text}
@@ -41,10 +41,10 @@ export const ResponseGrid: React.FC<Props> = ({ suggestions, onSelect, isLoading
                     {onAddFavorite && isFavorite && (
                         <button
                             onClick={() => onAddFavorite(item.text)}
-                            className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-sm opacity-0 group-hover:opacity-100 transition-opacity ${
+                            className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-all bg-white/90 shadow-sm border border-black/10 ${
                                 isFavorite(item.text)
-                                    ? 'bg-yellow-400 text-yellow-900'
-                                    : 'bg-gray-600 text-white hover:bg-gray-700'
+                                    ? 'text-[var(--accent-3)]'
+                                    : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
                             }`}
                             title={isFavorite(item.text) ? "Remove from favorites" : "Add to favorites"}
                         >

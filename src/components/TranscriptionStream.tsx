@@ -20,9 +20,9 @@ export const TranscriptionStream: React.FC<Props> = ({ messages, interimTranscri
     }, [messages, interimTranscript]);
 
     return (
-        <div className="flex-1 bg-gray-50 dark:bg-gray-800 rounded-xl p-4 shadow-inner overflow-y-auto mb-4 border border-gray-200 dark:border-gray-700 flex flex-col space-y-4">
+        <div className="flex-1 glass-panel rounded-3xl p-5 overflow-y-auto mb-4 flex flex-col gap-4">
             {messages.length === 0 && !interimTranscript && (
-                <div className="flex-1 flex items-center justify-center text-gray-400 italic">
+                <div className="flex-1 flex items-center justify-center text-[var(--ink-muted)] italic">
                     Listening for conversation...
                 </div>
             )}
@@ -30,12 +30,12 @@ export const TranscriptionStream: React.FC<Props> = ({ messages, interimTranscri
             {messages.map((msg, idx) => (
                 <div
                     key={msg.timestamp + idx}
-                    className={`flex ${msg.role === 'assistant' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex fade-in-up ${msg.role === 'assistant' ? 'justify-end' : 'justify-start'}`}
                 >
                     <div
                         className={`max-w-[80%] rounded-2xl px-5 py-3 shadow-sm ${msg.role === 'assistant'
-                                ? 'bg-indigo-600 text-white rounded-br-none'
-                                : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-none border border-gray-200 dark:border-gray-600'
+                                ? 'bg-[var(--accent)] text-white rounded-br-none'
+                                : 'bg-[var(--surface-strong)] text-[var(--ink)] rounded-bl-none border border-[var(--outline)]'
                             }`}
                         style={{ fontSize: `${fontSize}rem` }}
                     >
@@ -45,9 +45,9 @@ export const TranscriptionStream: React.FC<Props> = ({ messages, interimTranscri
             ))}
 
             {interimTranscript && (
-                <div className="flex justify-start">
-                    <div 
-                        className="max-w-[80%] rounded-2xl px-5 py-3 shadow-sm bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-bl-none animate-pulse italic"
+                <div className="flex justify-start fade-in-up">
+                    <div
+                        className="max-w-[80%] rounded-2xl px-5 py-3 shadow-sm bg-[rgba(28,27,31,0.08)] text-[var(--ink-muted)] rounded-bl-none animate-pulse italic"
                         style={{ fontSize: `${fontSize}rem` }}
                     >
                         {interimTranscript} ...

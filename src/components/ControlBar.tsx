@@ -11,26 +11,26 @@ interface Props {
 
 export const ControlBar: React.FC<Props> = ({ isListening, onToggleListening, onClear, onReset, fontSizePreset, onSetFontSize }) => {
     return (
-        <div className="flex justify-between items-center bg-white dark:bg-gray-900 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
-            <div className="flex space-x-4">
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 glass-panel p-4 rounded-3xl">
+            <div className="flex flex-wrap gap-3">
                 <button
                     onClick={onToggleListening}
-                    className={`flex items-center space-x-2 px-6 py-3 rounded-full font-bold transition-colors ${isListening
-                            ? 'bg-red-500 hover:bg-red-600 text-white'
-                            : 'bg-green-500 hover:bg-green-600 text-white'
+                    className={`flex items-center space-x-2 px-6 py-3 rounded-full font-semibold transition-all shadow-md hover:shadow-lg ${isListening
+                            ? 'bg-[var(--accent)] hover:bg-[#e25b4a] text-white'
+                            : 'bg-[var(--accent-2)] hover:bg-[#185c64] text-white'
                         }`}
                 >
                     <span>{isListening ? 'Stop Listening' : 'Start Listening'}</span>
                     {isListening && <span className="animate-pulse">●</span>}
                 </button>
             </div>
-            <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
                     <button
                         onClick={() => onSetFontSize('small')}
-                        className={`px-3 py-2 text-sm rounded-lg transition-colors font-semibold ${fontSizePreset === 'small'
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200'
+                        className={`px-3 py-2 text-sm rounded-full transition-all font-semibold border border-[var(--outline)] ${fontSizePreset === 'small'
+                            ? 'bg-[var(--accent-2)] text-white shadow-sm'
+                            : 'bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-[rgba(31,111,120,0.12)]'
                             }`}
                         title="Small font size"
                     >
@@ -38,9 +38,9 @@ export const ControlBar: React.FC<Props> = ({ isListening, onToggleListening, on
                     </button>
                     <button
                         onClick={() => onSetFontSize('medium')}
-                        className={`px-4 py-2 text-sm rounded-lg transition-colors font-semibold ${fontSizePreset === 'medium'
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200'
+                        className={`px-4 py-2 text-sm rounded-full transition-all font-semibold border border-[var(--outline)] ${fontSizePreset === 'medium'
+                            ? 'bg-[var(--accent-2)] text-white shadow-sm'
+                            : 'bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-[rgba(31,111,120,0.12)]'
                             }`}
                         title="Medium font size"
                     >
@@ -48,9 +48,9 @@ export const ControlBar: React.FC<Props> = ({ isListening, onToggleListening, on
                     </button>
                     <button
                         onClick={() => onSetFontSize('large')}
-                        className={`px-3 py-2 text-sm rounded-lg transition-colors font-semibold ${fontSizePreset === 'large'
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200'
+                        className={`px-3 py-2 text-sm rounded-full transition-all font-semibold border border-[var(--outline)] ${fontSizePreset === 'large'
+                            ? 'bg-[var(--accent-2)] text-white shadow-sm'
+                            : 'bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-[rgba(31,111,120,0.12)]'
                             }`}
                         title="Large font size"
                     >
@@ -59,13 +59,13 @@ export const ControlBar: React.FC<Props> = ({ isListening, onToggleListening, on
                 </div>
                 <button
                     onClick={onClear}
-                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 font-semibold rounded-lg transition-colors"
+                    className="px-4 py-2 bg-[var(--surface-strong)] hover:bg-[rgba(28,27,31,0.08)] text-[var(--ink)] font-semibold rounded-full transition-colors border border-[var(--outline)]"
                 >
                     Clear Transcript
                 </button>
                 <button
                     onClick={onReset}
-                    className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-colors"
+                    className="px-4 py-2 bg-[var(--accent)] hover:bg-[#e25b4a] text-white font-semibold rounded-full transition-colors shadow-sm"
                     title="Clear everything and reset the app"
                 >
                     Reset
