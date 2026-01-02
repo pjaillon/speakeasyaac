@@ -6,9 +6,9 @@
 
 @layer base {
   :root {
-    --bg: #f7f0e8;
-    --surface: #fff7ef;
-    --surface-strong: #ffffff;
+    --bg: #e3dad0;
+    --surface: #f2e7dd;
+    --surface-strong: #f7efe7;
     --ink: #1c1b1f;
     --ink-muted: #4b4e57;
     --accent: #f26d5b;
@@ -26,7 +26,7 @@
     min-height: 100vh;
     font-family: 'Space Grotesk', 'IBM Plex Sans', sans-serif;
     color: var(--ink);
-    background: linear-gradient(120deg, #f7f0e8 0%, #f1f7f8 42%, #fff4ea 100%);
+    background: linear-gradient(120deg, #e0d5ca 0%, #dfe7e7 42%, #f2e3d8 100%);
     position: relative;
   }
 
